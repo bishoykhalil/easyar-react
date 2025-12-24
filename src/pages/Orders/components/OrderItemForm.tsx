@@ -3,10 +3,8 @@ import {
   ModalForm,
   ProFormDigit,
   ProFormSelect,
-  ProFormText,
-  ProFormTextArea,
 } from '@ant-design/pro-components';
-import React from 'react';
+import React, { useRef } from 'react';
 
 type Props = {
   open: boolean;
@@ -15,6 +13,8 @@ type Props = {
 };
 
 const OrderItemForm: React.FC<Props> = ({ open, onOpenChange, onFinish }) => {
+  const formRef = useRef<any>();
+
   return (
     <ModalForm
       title="Add Item"
@@ -26,6 +26,7 @@ const OrderItemForm: React.FC<Props> = ({ open, onOpenChange, onFinish }) => {
       rowProps={{ gutter: 16 }}
       colProps={{ span: 12 }}
       onFinish={onFinish}
+      formRef={formRef}
     >
       <ProFormSelect
         name="priceListItemId"
@@ -43,6 +44,7 @@ const OrderItemForm: React.FC<Props> = ({ open, onOpenChange, onFinish }) => {
               res.data?.content?.map((p) => ({
                 label: p.name || '',
                 value: p.id!,
+                data: p,
               })) || []
             );
           } catch {
@@ -50,38 +52,22 @@ const OrderItemForm: React.FC<Props> = ({ open, onOpenChange, onFinish }) => {
           }
         }}
         allowClear
+        rules={[{ required: true, message: 'Select a price list item' }]}
+        fieldProps={{
+          onSelect: (_val, option: any) => {
+            const data = option?.data || {};
+            formRef.current?.setFieldsValue({
+              unitPriceNet: data.netPrice,
+              vatRate: data.vatRate,
+            });
+          },
+        }}
       />
-      <ProFormText
-        name="name"
-        label="Name"
-        rules={[{ required: true, message: 'Please enter name' }]}
-      />
-      <ProFormTextArea
-        name="description"
-        label="Description"
-        colProps={{ span: 24 }}
-        fieldProps={{ rows: 3 }}
-      />
-      <ProFormText name="unit" label="Unit" />
       <ProFormDigit
         name="quantity"
         label="Quantity"
         min={0}
         fieldProps={{ step: 0.1 }}
-      />
-      <ProFormDigit
-        name="unitPriceNet"
-        label="Unit Net Price"
-        min={0}
-        fieldProps={{ step: 0.01 }}
-      />
-      <ProFormDigit
-        name="vatRate"
-        label="VAT Rate"
-        min={0}
-        max={1}
-        fieldProps={{ step: 0.01 }}
-        tooltip="0.19 for 19%"
       />
       <ProFormDigit
         name="discountPercent"

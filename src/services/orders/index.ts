@@ -32,6 +32,8 @@ export interface OrderResponseDTO {
   items?: OrderItemDTO[];
   createdAt?: string;
   updatedAt?: string;
+  invoiceId?: number;
+  invoiceNumber?: string;
 }
 
 export interface PaginatedResponse<T> {

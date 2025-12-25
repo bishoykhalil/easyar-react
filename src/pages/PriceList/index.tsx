@@ -5,6 +5,7 @@ import {
   updatePriceItem,
   type PriceListItemDTO,
 } from '@/services/pricelist';
+import { getSettings } from '@/services/settings';
 import {
   PageContainer,
   ProTable,
@@ -21,11 +22,24 @@ const PriceListPage: React.FC = () => {
     undefined,
   );
   const [nameOptions, setNameOptions] = useState<{ value: string }[]>([]);
+  const [downloading, setDownloading] = useState(false);
+  const [settings, setSettings] = useState<any>();
 
   const money = new Intl.NumberFormat('en', {
     style: 'currency',
     currency: 'EUR',
   });
+
+  const fetchSettingsOnce = async () => {
+    if (settings) return settings;
+    try {
+      const res = await getSettings();
+      setSettings(res.data);
+      return res.data;
+    } catch {
+      return {};
+    }
+  };
 
   const columns: ProColumns<PriceListItemDTO>[] = [
     {
@@ -142,6 +156,84 @@ const PriceListPage: React.FC = () => {
     return `${field},${dir}`;
   };
 
+  const downloadPriceListPdf = async () => {
+    try {
+      setDownloading(true);
+      // fetch settings for header (with cache)
+      const settingsData = await fetchSettingsOnce();
+      // fetch all active items (coarse paging to avoid many requests)
+      let page = 0;
+      const size = 200;
+      let all: PriceListItemDTO[] = [];
+      // limit to avoid infinite loop
+      for (let i = 0; i < 10; i++) {
+        const res = await listPriceItemsPaged({
+          q: '%',
+          onlyActive: true,
+          page,
+          size,
+        });
+        const data = res.data;
+        if (data?.content) {
+          all = all.concat(data.content);
+        }
+        if (!data || data.last || data.content.length < size) break;
+        page += 1;
+      }
+
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ]);
+
+      const doc = new jsPDF();
+      const marginLeft = 14;
+      const marginTop = 16;
+      doc.setFontSize(18);
+      doc.text('Price List Offer', marginLeft, marginTop);
+
+      doc.setFontSize(11);
+      const companyLine = settingsData?.companyName || 'Company';
+      const addrLine = settingsData?.companyAddress || '';
+      const contactLine = settingsData?.contactInfo || '';
+      const infoStartY = marginTop + 8;
+      doc.text(companyLine, marginLeft, infoStartY);
+      if (addrLine) {
+        doc.text(addrLine, marginLeft, infoStartY + 6);
+      }
+      if (contactLine) {
+        doc.text(contactLine, marginLeft, infoStartY + 12);
+      }
+      doc.setFontSize(10);
+      doc.text(
+        `Generated: ${new Date().toLocaleString()}`,
+        marginLeft,
+        infoStartY + 20,
+      );
+
+      autoTable(doc, {
+        startY: infoStartY + 26,
+        head: [['Name', 'Unit', 'Net Price (€)', 'VAT']],
+        body: all.map((item) => [
+          item.name || '',
+          item.unit || '',
+          item.priceNet !== undefined ? money.format(item.priceNet) : '',
+          item.vatRate !== undefined
+            ? `${Math.round(item.vatRate * 100)}%`
+            : '',
+        ]),
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [33, 150, 243] },
+      });
+
+      doc.save('price-list.pdf');
+    } catch (err: any) {
+      message.error(err?.message || 'Failed to generate PDF');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <PageContainer>
       <ProTable<PriceListItemDTO>
@@ -178,6 +270,13 @@ const PriceListPage: React.FC = () => {
         toolbar={{
           title: 'Price List',
           actions: [
+            <Button
+              key="download"
+              onClick={downloadPriceListPdf}
+              loading={downloading}
+            >
+              Download Price List PDF
+            </Button>,
             <Button
               key="new"
               type="primary"

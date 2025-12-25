@@ -5,78 +5,153 @@ import {
   updateCustomer,
   type CustomerDTO,
 } from '@/services/customers';
+import { createOrder } from '@/services/orders';
 import {
   PageContainer,
+  ProFormSelect,
   ProTable,
   type ProColumns,
 } from '@ant-design/pro-components';
-import { Button, message, Popconfirm } from 'antd';
+import { history } from '@umijs/max';
+import { Button, message, Popconfirm, Space } from 'antd';
 import React, { useRef, useState } from 'react';
+import OrderForm from '../Orders/components/OrderForm';
+import CustomerDetailsDrawer from './components/CustomerDetailsDrawer';
 import CustomerForm from './components/CustomerForm';
 
 const CustomersPage: React.FC = () => {
   const actionRef = useRef<any>();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CustomerDTO | undefined>(undefined);
+  const [orderFormOpen, setOrderFormOpen] = useState(false);
+  const [orderInitial, setOrderInitial] = useState<any>(undefined);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<
+    CustomerDTO | undefined
+  >(undefined);
 
   const columns: ProColumns<CustomerDTO>[] = [
     {
       title: 'Name',
       dataIndex: 'name',
       ellipsis: true,
-    },
-    {
-      title: 'Email',
-      dataIndex: 'email',
-      ellipsis: true,
-    },
-    {
-      title: 'Phone',
-      dataIndex: 'phone',
+      renderFormItem: (_, { type, ...rest }) => {
+        if (type === 'form') return null;
+        return (
+          <ProFormSelect
+            {...rest}
+            showSearch
+            allowClear
+            placeholder="Search name"
+            debounceTime={300}
+            request={async ({ keyWords }) => {
+              const res = await listCustomers({
+                search: keyWords && keyWords.trim().length > 0 ? keyWords : '%',
+              });
+              const names = Array.from(
+                new Set(
+                  (res.data || [])
+                    .map((c) => c.name)
+                    .filter((n): n is string => !!n),
+                ),
+              );
+              return names.map((n) => ({ label: n, value: n }));
+            }}
+          />
+        );
+      },
     },
     {
       title: 'City',
       dataIndex: 'city',
-    },
-    {
-      title: 'Country',
-      dataIndex: 'countryCode',
-      width: 90,
-    },
-    {
-      title: 'Payment Terms (days)',
-      dataIndex: 'paymentTermsDays',
-      width: 140,
+      renderFormItem: (_, { type, ...rest }) => {
+        if (type === 'form') return null;
+        return (
+          <ProFormSelect
+            {...rest}
+            showSearch
+            allowClear
+            placeholder="Search city"
+            debounceTime={300}
+            request={async ({ keyWords }) => {
+              const res = await listCustomers({
+                search: keyWords && keyWords.trim().length > 0 ? keyWords : '%',
+              });
+              const cities = Array.from(
+                new Set(
+                  (res.data || [])
+                    .map((c) => c.city)
+                    .filter((n): n is string => !!n),
+                ),
+              );
+              return cities.map((n) => ({ label: n, value: n }));
+            }}
+          />
+        );
+      },
     },
     {
       title: 'Actions',
       valueType: 'option',
-      render: (_, record) => [
-        <a
-          key="edit"
-          onClick={() => {
-            setEditing(record);
-            setFormOpen(true);
-          }}
-        >
-          Edit
-        </a>,
-        <Popconfirm
-          key="delete"
-          title="Delete customer?"
-          onConfirm={async () => {
-            try {
-              await deleteCustomer(record.id!);
-              message.success('Deleted');
-              actionRef.current?.reload();
-            } catch (err: any) {
-              message.error(err?.data?.message || 'Delete failed');
-            }
-          }}
-        >
-          <a style={{ color: 'red' }}>Delete</a>
-        </Popconfirm>,
-      ],
+      render: (_, record) => (
+        <Space size={12}>
+          <a
+            onClick={() => {
+              setEditing(record);
+              setFormOpen(true);
+            }}
+          >
+            Edit
+          </a>
+          <Popconfirm
+            title="Delete customer?"
+            onConfirm={async () => {
+              try {
+                await deleteCustomer(record.id!);
+                message.success('Deleted');
+                actionRef.current?.reload();
+              } catch (err: any) {
+                message.error(err?.data?.message || 'Delete failed');
+              }
+            }}
+          >
+            <a style={{ color: 'red' }}>Delete</a>
+          </Popconfirm>
+          <a
+            onClick={() => {
+              setSelectedCustomer(record);
+              setDetailsOpen(true);
+            }}
+          >
+            Details
+          </a>
+          <a
+            onClick={() => {
+              history.push(
+                `/billing/orders?customerId=${
+                  record.id
+                }&customerName=${encodeURIComponent(record.name)}&new=1`,
+              );
+            }}
+          >
+            New Order
+          </a>
+          <Button
+            type="link"
+            disabled={!record.orderCount}
+            onClick={() => {
+              history.push(
+                `/billing/orders?customerId=${
+                  record.id
+                }&customerName=${encodeURIComponent(record.name)}`,
+              );
+            }}
+            style={{ padding: 0 }}
+          >
+            View Orders
+          </Button>
+        </Space>
+      ),
     },
   ];
 
@@ -126,6 +201,36 @@ const CustomersPage: React.FC = () => {
               New Customer
             </Button>,
           ],
+        }}
+      />
+
+      <OrderForm
+        open={orderFormOpen}
+        initialValues={orderInitial}
+        onOpenChange={(v) => {
+          setOrderFormOpen(v);
+          if (!v) setOrderInitial(undefined);
+        }}
+        onFinish={async (values) => {
+          try {
+            await createOrder(values);
+            message.success('Order created');
+            setOrderFormOpen(false);
+            setOrderInitial(undefined);
+            return true;
+          } catch (err: any) {
+            message.error(err?.data?.message || 'Create order failed');
+            return false;
+          }
+        }}
+      />
+
+      <CustomerDetailsDrawer
+        open={detailsOpen}
+        customer={selectedCustomer}
+        onClose={() => {
+          setDetailsOpen(false);
+          setSelectedCustomer(undefined);
         }}
       />
 

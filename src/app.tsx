@@ -6,6 +6,7 @@ const loginPath = '/user/login';
 const TOKEN_KEY = 'easyar_token';
 const ROLES_KEY = 'easyar_roles';
 const PERMS_KEY = 'easyar_perms';
+const THEME_KEY = 'easyar_theme';
 
 export type InitialState = {
   token?: string;
@@ -73,12 +74,17 @@ export const layout: RuntimeConfig['layout'] = ({ initialState }) => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ROLES_KEY);
     localStorage.removeItem(PERMS_KEY);
+    localStorage.removeItem(THEME_KEY);
     history.push(loginPath);
   };
+
+  const savedTheme = localStorage.getItem(THEME_KEY) || 'SYSTEM';
+  const navTheme = savedTheme === 'DARK' ? 'realDark' : 'light';
 
   return {
     title: 'EasyAR Admin',
     logo: 'https://img.alicdn.com/tfs/TB1YHEpwUT1gK0jSZFhXXaAtVXa-28-27.svg',
+    navTheme,
     menu: {
       locale: false,
     },

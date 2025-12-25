@@ -1,9 +1,7 @@
 import { listCustomers, type CustomerDTO } from '@/services/customers';
 import {
   ModalForm,
-  ProFormDigit,
   ProFormSelect,
-  ProFormText,
   ProFormTextArea,
 } from '@ant-design/pro-components';
 import React from 'react';
@@ -11,10 +9,16 @@ import React from 'react';
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  initialValues?: any;
   onFinish: (values: any) => Promise<boolean>;
 };
 
-const OrderForm: React.FC<Props> = ({ open, onOpenChange, onFinish }) => {
+const OrderForm: React.FC<Props> = ({
+  open,
+  onOpenChange,
+  initialValues,
+  onFinish,
+}) => {
   return (
     <ModalForm
       title="New Order"
@@ -25,6 +29,7 @@ const OrderForm: React.FC<Props> = ({ open, onOpenChange, onFinish }) => {
       grid
       rowProps={{ gutter: 16 }}
       colProps={{ span: 12 }}
+      initialValues={initialValues}
       onFinish={onFinish}
     >
       <ProFormSelect
@@ -48,15 +53,6 @@ const OrderForm: React.FC<Props> = ({ open, onOpenChange, onFinish }) => {
             return [];
           }
         }}
-      />
-      <ProFormText name="currency" label="Currency" initialValue="EUR" />
-      <ProFormDigit
-        name="defaultVatRate"
-        label="Default VAT Rate"
-        min={0}
-        max={1}
-        fieldProps={{ step: 0.01 }}
-        tooltip="0.19 for 19%"
       />
       <ProFormTextArea name="notes" label="Notes" colProps={{ span: 24 }} />
     </ModalForm>

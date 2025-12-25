@@ -16,6 +16,7 @@ import {
   ProTable,
   type ProColumns,
 } from '@ant-design/pro-components';
+import { history, useLocation } from '@umijs/max';
 import {
   Badge,
   Button,
@@ -46,8 +47,15 @@ const statusColors: Record<
 const OrdersPage: React.FC = () => {
   const actionRef = useRef<any>();
   const [formOpen, setFormOpen] = useState(false);
+  const [initialOrderValues, setInitialOrderValues] = useState<any>(undefined);
   const [selectedOrder, setSelectedOrder] = useState<
     OrderResponseDTO | undefined
+  >(undefined);
+  const [filterCustomerId, setFilterCustomerId] = useState<number | undefined>(
+    undefined,
+  );
+  const [filterCustomerName, setFilterCustomerName] = useState<
+    string | undefined
   >(undefined);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [itemForm] = Form.useForm();
@@ -97,6 +105,22 @@ const OrdersPage: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawerOpen]);
+
+  // Open new order modal prefilled if query params instruct
+  const location = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const customerId = params.get('customerId');
+    const customerName = params.get('customerName') || undefined;
+    setFilterCustomerId(customerId ? Number(customerId) : undefined);
+    setFilterCustomerName(customerName || undefined);
+    if (params.get('new') === '1') {
+      setInitialOrderValues(
+        customerId ? { customerId: Number(customerId) } : {},
+      );
+      setFormOpen(true);
+    }
+  }, [location.search]);
 
   const columns: ProColumns<OrderResponseDTO>[] = [
     {
@@ -241,6 +265,7 @@ const OrdersPage: React.FC = () => {
             const res = await listOrdersPaged({
               q: params.keyword,
               status: params.status,
+              customerId: filterCustomerId,
               page: (params.current || 1) - 1,
               size: params.pageSize || 10,
               sort: undefined,
@@ -258,7 +283,23 @@ const OrdersPage: React.FC = () => {
         }}
         toolbar={{
           title: 'Orders',
+          subTitle: filterCustomerName
+            ? `Filtered by: ${filterCustomerName}`
+            : undefined,
           actions: [
+            filterCustomerId ? (
+              <Button
+                key="clear-filter"
+                onClick={() => {
+                  setFilterCustomerId(undefined);
+                  setFilterCustomerName(undefined);
+                  history.replace('/billing/orders');
+                  actionRef.current?.reload();
+                }}
+              >
+                Clear Customer Filter
+              </Button>
+            ) : null,
             <Button
               key="new"
               type="primary"
@@ -275,12 +316,15 @@ const OrdersPage: React.FC = () => {
       <OrderForm
         open={formOpen}
         onOpenChange={(v) => setFormOpen(v)}
+        initialValues={initialOrderValues}
         onFinish={async (values) => {
           try {
             await createOrder(values);
             message.success('Order created');
             setFormOpen(false);
             actionRef.current?.reload();
+            setInitialOrderValues(undefined);
+            history.replace('/billing/orders');
             return true;
           } catch (err: any) {
             message.error(err?.data?.message || 'Create failed');
@@ -416,8 +460,8 @@ const OrdersPage: React.FC = () => {
               <div
                 style={{
                   padding: 12,
-                  background: '#fafafa',
-                  border: '1px solid #f0f0f0',
+                  background: '#1f1f1f',
+                  border: '1px solid #303030',
                   borderRadius: 6,
                   marginBottom: 16,
                 }}
@@ -484,8 +528,8 @@ const OrdersPage: React.FC = () => {
                     style={{
                       textAlign: 'left',
                       padding: '8px',
-                      borderBottom: '1px solid #f0f0f0',
-                      background: '#fafafa',
+                      borderBottom: '1px solid #303030',
+                      background: '#1f1f1f',
                     }}
                   >
                     Name
@@ -494,8 +538,8 @@ const OrdersPage: React.FC = () => {
                     style={{
                       textAlign: 'left',
                       padding: '8px',
-                      borderBottom: '1px solid #f0f0f0',
-                      background: '#fafafa',
+                      borderBottom: '1px solid #303030',
+                      background: '#1f1f1f',
                     }}
                   >
                     Unit
@@ -504,8 +548,8 @@ const OrdersPage: React.FC = () => {
                     style={{
                       textAlign: 'right',
                       padding: '8px',
-                      borderBottom: '1px solid #f0f0f0',
-                      background: '#fafafa',
+                      borderBottom: '1px solid #303030',
+                      background: '#1f1f1f',
                     }}
                   >
                     Qty
@@ -514,8 +558,8 @@ const OrdersPage: React.FC = () => {
                     style={{
                       textAlign: 'right',
                       padding: '8px',
-                      borderBottom: '1px solid #f0f0f0',
-                      background: '#fafafa',
+                      borderBottom: '1px solid #303030',
+                      background: '#1f1f1f',
                     }}
                   >
                     Unit Net
@@ -524,18 +568,8 @@ const OrdersPage: React.FC = () => {
                     style={{
                       textAlign: 'right',
                       padding: '8px',
-                      borderBottom: '1px solid #f0f0f0',
-                      background: '#fafafa',
-                    }}
-                  >
-                    VAT
-                  </th>
-                  <th
-                    style={{
-                      textAlign: 'right',
-                      padding: '8px',
-                      borderBottom: '1px solid #f0f0f0',
-                      background: '#fafafa',
+                      borderBottom: '1px solid #303030',
+                      background: '#1f1f1f',
                     }}
                   >
                     Net
@@ -544,8 +578,8 @@ const OrdersPage: React.FC = () => {
                     style={{
                       textAlign: 'right',
                       padding: '8px',
-                      borderBottom: '1px solid #f0f0f0',
-                      background: '#fafafa',
+                      borderBottom: '1px solid #303030',
+                      background: '#1f1f1f',
                     }}
                   >
                     Gross
@@ -559,12 +593,12 @@ const OrdersPage: React.FC = () => {
                 {selectedOrder.items?.map((item, idx) => (
                   <tr
                     key={item.id || idx}
-                    style={{ backgroundColor: idx % 2 ? '#fafafa' : undefined }}
+                    style={{ backgroundColor: idx % 2 ? '#1b1b1b' : '#151515' }}
                   >
                     <td
                       style={{
                         padding: '8px',
-                        borderBottom: '1px solid #f5f5f5',
+                        borderBottom: '1px solid #303030',
                       }}
                     >
                       <div style={{ fontWeight: 600 }}>{item.name}</div>
@@ -575,7 +609,7 @@ const OrdersPage: React.FC = () => {
                     <td
                       style={{
                         padding: '8px',
-                        borderBottom: '1px solid #f5f5f5',
+                        borderBottom: '1px solid #303030',
                       }}
                     >
                       {item.unit}
@@ -583,7 +617,7 @@ const OrdersPage: React.FC = () => {
                     <td
                       style={{
                         padding: '8px',
-                        borderBottom: '1px solid #f5f5f5',
+                        borderBottom: '1px solid #303030',
                         textAlign: 'right',
                       }}
                     >
@@ -592,7 +626,7 @@ const OrdersPage: React.FC = () => {
                     <td
                       style={{
                         padding: '8px',
-                        borderBottom: '1px solid #f5f5f5',
+                        borderBottom: '1px solid #303030',
                         textAlign: 'right',
                       }}
                     >
@@ -601,16 +635,7 @@ const OrdersPage: React.FC = () => {
                     <td
                       style={{
                         padding: '8px',
-                        borderBottom: '1px solid #f5f5f5',
-                        textAlign: 'right',
-                      }}
-                    >
-                      {item.vatRate}
-                    </td>
-                    <td
-                      style={{
-                        padding: '8px',
-                        borderBottom: '1px solid #f5f5f5',
+                        borderBottom: '1px solid #303030',
                         textAlign: 'right',
                       }}
                     >
@@ -619,7 +644,7 @@ const OrdersPage: React.FC = () => {
                     <td
                       style={{
                         padding: '8px',
-                        borderBottom: '1px solid #f5f5f5',
+                        borderBottom: '1px solid #303030',
                         textAlign: 'right',
                       }}
                     >
@@ -629,7 +654,7 @@ const OrdersPage: React.FC = () => {
                       <td
                         style={{
                           padding: '8px',
-                          borderBottom: '1px solid #f5f5f5',
+                          borderBottom: '1px solid #303030',
                           textAlign: 'right',
                         }}
                       >

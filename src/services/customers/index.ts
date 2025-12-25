@@ -13,6 +13,7 @@ export interface CustomerDTO {
   taxNumber?: string;
   paymentTermsDays?: number;
   notes?: string;
+  orderCount?: number;
 }
 
 export interface PaginatedResponse<T> {

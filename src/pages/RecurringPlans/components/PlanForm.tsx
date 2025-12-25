@@ -4,11 +4,12 @@ import {
   ModalForm,
   ProFormDatePicker,
   ProFormDigit,
+  ProFormGroup,
   ProFormSelect,
   ProFormText,
   ProFormTextArea,
 } from '@ant-design/pro-components';
-import { Button, message, Table } from 'antd';
+import { Button, Divider, message, Table, Typography } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
 
 type Props = {
@@ -92,9 +93,15 @@ const PlanForm: React.FC<Props> = ({
       initialValues={initialValues}
       modalProps={{ destroyOnClose: true }}
       layout="vertical"
-      grid
-      rowProps={{ gutter: 16 }}
-      colProps={{ span: 12 }}
+      submitter={{
+        searchConfig: {
+          submitText: initialValues?.id ? 'Save' : 'Create',
+          resetText: 'Cancel',
+        },
+        resetButtonProps: {
+          onClick: () => onOpenChange(false),
+        },
+      }}
       formRef={formRef}
       onFinish={async (values) => {
         if (items.length === 0) {
@@ -105,48 +112,98 @@ const PlanForm: React.FC<Props> = ({
         return onFinish(payload);
       }}
     >
-      <ProFormSelect
-        name="customerId"
-        label="Customer"
-        rules={[{ required: true, message: 'Please select customer' }]}
-        showSearch
-        debounceTime={300}
-        request={async ({ keyWords }) => {
-          try {
-            const res = await listCustomers({
-              search: keyWords && keyWords.length > 0 ? keyWords : '%',
-            });
-            return (
-              res.data?.map((c: CustomerDTO) => ({
-                label: c.name,
-                value: c.id!,
-              })) || []
-            );
-          } catch {
-            return [];
-          }
-        }}
+      <ProFormGroup>
+        <ProFormSelect
+          name="customerId"
+          label="Customer"
+          rules={[{ required: true, message: 'Please select customer' }]}
+          showSearch
+          debounceTime={300}
+          request={async ({ keyWords }) => {
+            try {
+              const res = await listCustomers({
+                search: keyWords && keyWords.length > 0 ? keyWords : '%',
+              });
+              return (
+                res.data?.map((c: CustomerDTO) => ({
+                  label: c.name,
+                  value: c.id!,
+                })) || []
+              );
+            } catch {
+              return [];
+            }
+          }}
+          colProps={{ span: 12 }}
+        />
+        <ProFormText
+          name="currency"
+          label="Currency"
+          placeholder="EUR"
+          colProps={{ span: 6 }}
+          fieldProps={{ disabled: true }}
+        />
+        <ProFormDigit
+          name="paymentTermsDays"
+          label="Payment Terms (days)"
+          min={0}
+          max={365}
+          placeholder="e.g. 14"
+          colProps={{ span: 6 }}
+          fieldProps={{ disabled: true }}
+        />
+      </ProFormGroup>
+
+      <ProFormGroup>
+        <ProFormSelect
+          name="frequency"
+          label="Frequency"
+          valueEnum={{
+            DAILY: 'Daily',
+            WEEKLY: 'Weekly',
+            MONTHLY: 'Monthly',
+            YEARLY: 'Yearly',
+          }}
+          initialValue="MONTHLY"
+          colProps={{ span: 6 }}
+        />
+        <ProFormDatePicker
+          name="startDate"
+          label="Start Date"
+          rules={[{ required: true, message: 'Select start date' }]}
+          colProps={{ span: 6 }}
+        />
+        <ProFormDatePicker
+          name="nextRunDate"
+          label="Next Run Date"
+          tooltip="Defaults to start date if left empty"
+          colProps={{ span: 6 }}
+        />
+        <ProFormDigit
+          name="maxOccurrences"
+          label="Max Occurrences"
+          rules={[{ required: true, message: 'Enter max occurrences' }]}
+          min={1}
+          tooltip="Plan stops after this many invoices"
+          colProps={{ span: 6 }}
+        />
+      </ProFormGroup>
+
+      <ProFormTextArea
+        name="notes"
+        label="Notes"
+        colProps={{ span: 24 }}
+        fieldProps={{ rows: 3 }}
       />
-      <ProFormText name="currency" label="Currency" placeholder="EUR" />
-      <ProFormDigit
-        name="paymentTermsDays"
-        label="Payment Terms (days)"
-        min={0}
-        max={365}
-      />
-      <ProFormDatePicker
-        name="startDate"
-        label="Start Date"
-        rules={[{ required: true, message: 'Select start date' }]}
-      />
-      <ProFormDatePicker name="nextRunDate" label="Next Run Date" />
-      <ProFormDigit
-        name="maxOccurrences"
-        label="Max Occurrences"
-        rules={[{ required: true, message: 'Enter max occurrences' }]}
-        min={1}
-      />
-      <ProFormTextArea name="notes" label="Notes" colProps={{ span: 24 }} />
+
+      <Divider style={{ marginTop: 12, marginBottom: 12 }} />
+      <Typography.Title level={5} style={{ marginBottom: 8 }}>
+        Items
+      </Typography.Title>
+      <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
+        Select a price list item, set quantity, and click Add. Prices/VAT will
+        follow the selected item.
+      </Typography.Paragraph>
 
       <div
         style={{
@@ -218,6 +275,7 @@ const PlanForm: React.FC<Props> = ({
           dataSource={items.map((it, idx) => ({ key: idx, ...it }))}
           columns={[
             { title: 'Item', dataIndex: 'name' },
+            { title: 'Unit', dataIndex: 'unit', width: 100 },
             {
               title: 'Quantity',
               dataIndex: 'quantity',

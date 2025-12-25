@@ -1,6 +1,11 @@
 import { request } from '@umijs/max';
 
-export type OrderStatus = 'DRAFT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+export type OrderStatus =
+  | 'DRAFT'
+  | 'CONFIRMED'
+  | 'INVOICED'
+  | 'COMPLETED'
+  | 'CANCELLED';
 
 export interface OrderItemDTO {
   id?: number;

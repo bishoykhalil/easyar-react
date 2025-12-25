@@ -38,6 +38,7 @@ const statusColors: Record<
 > = {
   DRAFT: 'default',
   CONFIRMED: 'processing',
+  INVOICED: 'processing',
   COMPLETED: 'success',
   CANCELLED: 'error',
 };
@@ -117,6 +118,7 @@ const OrdersPage: React.FC = () => {
       valueEnum: {
         DRAFT: { text: 'DRAFT' },
         CONFIRMED: { text: 'CONFIRMED' },
+        INVOICED: { text: 'INVOICED' },
         COMPLETED: { text: 'COMPLETED' },
         CANCELLED: { text: 'CANCELLED' },
       },
@@ -320,6 +322,17 @@ const OrdersPage: React.FC = () => {
                     </Space>
                   )}
                   {selectedOrder.status === 'CONFIRMED' && (
+                    <Space size={4}>
+                      <a
+                        onClick={() =>
+                          handleStatusChange(selectedOrder.id, 'INVOICED')
+                        }
+                      >
+                        Mark Invoiced
+                      </a>
+                    </Space>
+                  )}
+                  {selectedOrder.status === 'INVOICED' && (
                     <Space size={4}>
                       <a
                         onClick={() =>

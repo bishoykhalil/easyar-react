@@ -22,7 +22,9 @@ export interface RecurringPlanDTO {
   nextRunDate: string;
   maxOccurrences: number;
   generatedCount: number;
+  remainingOccurrences?: number;
   active: boolean;
+  status?: string;
   notes?: string;
   items: RecurringPlanItemDTO[];
   createdAt?: string;

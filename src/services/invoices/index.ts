@@ -72,10 +72,12 @@ export async function listInvoicesPaged(params: {
 }
 
 export async function createFromOrder(orderId: number) {
-  return request<ApiResponse<InvoiceResponseDTO>>('/api/invoices', {
-    method: 'POST',
-    data: { orderId },
-  });
+  return request<ApiResponse<InvoiceResponseDTO>>(
+    `/api/orders/${orderId}/invoice`,
+    {
+      method: 'POST',
+    },
+  );
 }
 
 export async function getInvoice(id: number) {

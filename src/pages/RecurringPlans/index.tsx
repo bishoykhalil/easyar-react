@@ -55,6 +55,12 @@ const RecurringPlansPage: React.FC = () => {
       valueType: 'date',
     },
     {
+      title: 'Last Run',
+      dataIndex: 'lastRunDate',
+      valueType: 'date',
+      render: (_, r) => r.lastRunDate || '-',
+    },
+    {
       title: 'Count',
       dataIndex: 'generatedCount',
       render: (_, r) => `${r.generatedCount}/${r.maxOccurrences}`,
@@ -98,8 +104,12 @@ const RecurringPlansPage: React.FC = () => {
             disabled={!canGenerate}
             onClick={async () => {
               try {
-                await generateNow(record.id);
+                const res = await generateNow(record.id);
+                const invId = res?.data;
                 message.success('Invoice generated');
+                if (invId) {
+                  window.open(`/billing/invoices?keyword=${invId}`, '_blank');
+                }
                 actionRef.current?.reload();
               } catch (err: any) {
                 message.error(err?.data?.message || 'Generate failed');

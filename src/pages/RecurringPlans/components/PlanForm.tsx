@@ -111,6 +111,15 @@ const PlanForm: React.FC<Props> = ({
         const payload = { ...values, items };
         return onFinish(payload);
       }}
+      onValuesChange={(changed) => {
+        // auto-set nextRunDate to startDate if empty
+        if (
+          changed.startDate &&
+          !formRef.current?.getFieldValue('nextRunDate')
+        ) {
+          formRef.current?.setFieldsValue({ nextRunDate: changed.startDate });
+        }
+      }}
     >
       <ProFormGroup>
         <ProFormSelect

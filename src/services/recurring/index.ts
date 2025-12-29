@@ -9,6 +9,7 @@ export interface RecurringPlanItemDTO {
   quantity?: number;
   unitPriceNet?: number;
   vatRate?: number;
+  discountPercent?: number;
 }
 
 export interface RecurringPlanDTO {
@@ -20,6 +21,7 @@ export interface RecurringPlanDTO {
   frequency: string;
   startDate: string;
   nextRunDate: string;
+  lastRunDate?: string;
   maxOccurrences: number;
   generatedCount: number;
   remainingOccurrences?: number;
@@ -84,6 +86,17 @@ export async function generateNow(id: number) {
     `/api/recurring-plans/${id}/generate-now`,
     {
       method: 'POST',
+    },
+  );
+}
+
+// Create recurring plan from an existing invoice (snapshots invoice items)
+export async function createPlanFromInvoice(invoiceId: number, data: any) {
+  return request<ApiResponse<RecurringPlanDTO>>(
+    `/api/recurring-plans/from-invoice/${invoiceId}`,
+    {
+      method: 'POST',
+      data,
     },
   );
 }

@@ -8,6 +8,7 @@ import {
   type InvoiceResponseDTO,
   type InvoiceStatus,
 } from '@/services/invoices';
+import { createPlanFromInvoice } from '@/services/recurring';
 import {
   PageContainer,
   ProTable,
@@ -17,15 +18,23 @@ import {
   Badge,
   Button,
   Card,
+  DatePicker,
   Descriptions,
   Divider,
   Drawer,
+  Form,
+  Input,
+  InputNumber,
   message,
+  Modal,
   Popconfirm,
+  Select,
   Space,
+  Table,
   Tag,
   Typography,
 } from 'antd';
+import dayjs from 'dayjs';
 import React, { useRef, useState } from 'react';
 import CreateInvoiceForm from './components/CreateInvoiceForm';
 
@@ -55,6 +64,41 @@ const InvoicesPage: React.FC = () => {
     undefined,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [creatingPlan, setCreatingPlan] = useState(false);
+  const [planModalOpen, setPlanModalOpen] = useState(false);
+  const [planInvoice, setPlanInvoice] = useState<
+    InvoiceResponseDTO | undefined
+  >(undefined);
+  const [planForm] = Form.useForm();
+
+  const openPlanModal = async (record: InvoiceResponseDTO) => {
+    try {
+      setCreatingPlan(true);
+      const res = await getInvoice(record.id);
+      if (!res.data?.items || res.data.items.length === 0) {
+        message.error('Invoice has no items to create a plan');
+        setCreatingPlan(false);
+        return;
+      }
+      setPlanInvoice(res.data);
+      setPlanModalOpen(true);
+      const today = dayjs();
+      planForm.setFieldsValue({
+        startDate: today,
+        nextRunDate: today,
+        maxOccurrences: 12,
+        frequency: 'MONTHLY',
+        notes: `Created from invoice ${res.data.invoiceNumber || res.data.id}`,
+      });
+    } catch (err: any) {
+      const backendMsg = err?.data?.message || err?.response?.data?.message;
+      const msg =
+        backendMsg || err?.message || 'Failed to create recurring plan';
+      message.error(msg);
+    } finally {
+      setCreatingPlan(false);
+    }
+  };
 
   const openPdf = async (id: number) => {
     try {
@@ -166,6 +210,16 @@ const InvoicesPage: React.FC = () => {
             View
           </a>
           <a onClick={() => openPdf(record.id)}>PDF</a>
+          {record.recurring ? null : (
+            <Button
+              size="small"
+              type="link"
+              loading={creatingPlan}
+              onClick={() => openPlanModal(record)}
+            >
+              Create Plan
+            </Button>
+          )}
           {record.status === 'DRAFT' && (
             <Popconfirm
               title="Delete invoice?"
@@ -377,6 +431,164 @@ const InvoicesPage: React.FC = () => {
           </>
         )}
       </Drawer>
+
+      <Modal
+        title={`Create Recurring Plan from Invoice ${
+          planInvoice?.invoiceNumber || planInvoice?.id || ''
+        }`}
+        open={planModalOpen}
+        onCancel={() => setPlanModalOpen(false)}
+        destroyOnClose
+        okText="Create Plan"
+        okButtonProps={{ loading: creatingPlan }}
+        onOk={async () => {
+          try {
+            const values = await planForm.validateFields();
+            if (!planInvoice) return;
+            setCreatingPlan(true);
+            const payload = {
+              currency: planInvoice.currency,
+              paymentTermsDays: planInvoice.paymentTermsDays,
+              startDate: values.startDate?.format('YYYY-MM-DD'),
+              nextRunDate: values.nextRunDate?.format('YYYY-MM-DD'),
+              maxOccurrences: values.maxOccurrences,
+              notes: values.notes,
+              frequency: values.frequency,
+            };
+            const res = await createPlanFromInvoice(planInvoice.id, payload);
+            message.success('Recurring plan created');
+            setPlanModalOpen(false);
+            if (res.data?.id) {
+              window.open(
+                `/billing/recurring-plans?planId=${res.data.id}`,
+                '_blank',
+              );
+            }
+          } catch (err: any) {
+            const backendMsg =
+              err?.data?.message || err?.response?.data?.message;
+            const msg =
+              backendMsg || err?.message || 'Failed to create recurring plan';
+            message.error(msg);
+          } finally {
+            setCreatingPlan(false);
+          }
+        }}
+      >
+        {planInvoice ? (
+          <Space direction="vertical" style={{ width: '100%' }} size="large">
+            <Descriptions column={2} size="small" bordered>
+              <Descriptions.Item label="Customer">
+                {planInvoice.customerName}
+              </Descriptions.Item>
+              <Descriptions.Item label="Currency">
+                {planInvoice.currency || 'EUR'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Status">
+                {planInvoice.status}
+              </Descriptions.Item>
+              <Descriptions.Item label="Total Gross">
+                {money.format(planInvoice.totalGross || 0)}
+              </Descriptions.Item>
+            </Descriptions>
+            <Form
+              form={planForm}
+              layout="vertical"
+              initialValues={{
+                frequency: 'MONTHLY',
+                maxOccurrences: 12,
+              }}
+            >
+              <Space
+                direction="vertical"
+                style={{ width: '100%' }}
+                size="middle"
+              >
+                <Space style={{ display: 'flex' }} size={12}>
+                  <Form.Item
+                    name="maxOccurrences"
+                    label="Max Occurrences"
+                    rules={[
+                      { required: true, message: 'Enter max occurrences' },
+                    ]}
+                    style={{ flex: 1 }}
+                  >
+                    <InputNumber min={1} max={1000} style={{ width: '100%' }} />
+                  </Form.Item>
+                  <Form.Item
+                    name="frequency"
+                    label="Frequency"
+                    style={{ flex: 1 }}
+                  >
+                    <Select
+                      options={[
+                        { label: 'Monthly', value: 'MONTHLY' },
+                        { label: 'Weekly', value: 'WEEKLY' },
+                        { label: 'Daily', value: 'DAILY' },
+                        { label: 'Yearly', value: 'YEARLY' },
+                      ]}
+                    />
+                  </Form.Item>
+                </Space>
+                <Space style={{ display: 'flex' }} size={12}>
+                  <Form.Item
+                    name="startDate"
+                    label="Start Date"
+                    rules={[{ required: true, message: 'Select start date' }]}
+                    style={{ flex: 1 }}
+                  >
+                    <DatePicker style={{ width: '100%' }} />
+                  </Form.Item>
+                  <Form.Item
+                    name="nextRunDate"
+                    label="Next Run Date"
+                    style={{ flex: 1 }}
+                  >
+                    <DatePicker style={{ width: '100%' }} />
+                  </Form.Item>
+                </Space>
+                <Form.Item name="notes" label="Notes">
+                  <Input.TextArea rows={3} />
+                </Form.Item>
+              </Space>
+            </Form>
+            <Typography.Title level={5} style={{ marginBottom: 8 }}>
+              Items (read-only)
+            </Typography.Title>
+            <Table
+              size="small"
+              pagination={false}
+              rowKey={(_, idx) => idx as number}
+              dataSource={planInvoice.items || []}
+              columns={[
+                { title: 'Name', dataIndex: 'name' },
+                { title: 'Unit', dataIndex: 'unit', width: 80 },
+                { title: 'Qty', dataIndex: 'quantity', width: 80 },
+                {
+                  title: 'Net',
+                  dataIndex: 'lineNet',
+                  render: (val) => money.format(val || 0),
+                  width: 100,
+                },
+                {
+                  title: 'VAT',
+                  dataIndex: 'vatRate',
+                  render: (val) => `${(val ?? 0) * 100}%`,
+                  width: 80,
+                },
+                {
+                  title: 'Gross',
+                  dataIndex: 'lineGross',
+                  render: (val) => money.format(val || 0),
+                  width: 100,
+                },
+              ]}
+            />
+          </Space>
+        ) : (
+          <div>Loading invoice...</div>
+        )}
+      </Modal>
     </PageContainer>
   );
 };

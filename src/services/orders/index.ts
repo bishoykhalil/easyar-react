@@ -28,6 +28,8 @@ export interface OrderResponseDTO {
   customerId: number;
   customerName: string;
   status: OrderStatus;
+  recurring?: boolean;
+  recurringPlanId?: number;
   currency?: string;
   defaultVatRate?: number;
   notes?: string;

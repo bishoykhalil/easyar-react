@@ -1,3 +1,4 @@
+import { listCustomers, type CustomerDTO } from '@/services/customers';
 import { createFromOrder, downloadInvoicePdf } from '@/services/invoices';
 import {
   addItem,
@@ -15,6 +16,7 @@ import {
   PageContainer,
   ProTable,
   type ProColumns,
+  type ProFormInstance,
 } from '@ant-design/pro-components';
 import { history, useLocation } from '@umijs/max';
 import {
@@ -27,8 +29,11 @@ import {
   InputNumber,
   message,
   Popconfirm,
+  Segmented,
   Select,
   Space,
+  Tag,
+  Typography,
 } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
 import OrderForm from './components/OrderForm';
@@ -51,6 +56,14 @@ const OrdersPage: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<
     OrderResponseDTO | undefined
   >(undefined);
+  const formRef = useRef<ProFormInstance>();
+  const [customerDrawerOpen, setCustomerDrawerOpen] = useState(false);
+  const [customerDetails, setCustomerDetails] = useState<CustomerDTO | null>(
+    null,
+  );
+  const [statusQuickFilter, setStatusQuickFilter] = useState<string>('ALL');
+  const [tableLoading, setTableLoading] = useState(false);
+  const [tableData, setTableData] = useState<OrderResponseDTO[]>([]);
   const [filterCustomerId, setFilterCustomerId] = useState<number | undefined>(
     undefined,
   );
@@ -63,6 +76,9 @@ const OrdersPage: React.FC = () => {
     { label: string; value: number; data: any }[]
   >([]);
   const [adding, setAdding] = useState(false);
+  const [customerOptions, setCustomerOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
   const money = new Intl.NumberFormat('en', {
     style: 'currency',
     currency: 'EUR',
@@ -126,17 +142,97 @@ const OrdersPage: React.FC = () => {
     {
       title: 'Order #',
       dataIndex: 'orderNumber',
-      render: (_, record) => record.orderNumber || `#${record.id}`,
+      render: (_, record) => (
+        <a
+          onClick={async () => {
+            try {
+              const res = await getOrder(record.id);
+              setSelectedOrder(res.data);
+              setDrawerOpen(true);
+            } catch (err: any) {
+              message.error(err?.data?.message || 'Failed to load order');
+            }
+          }}
+        >
+          {record.orderNumber || `#${record.id}`}
+        </a>
+      ),
     },
     {
       title: 'Customer',
       dataIndex: 'customerName',
+      renderFormItem: (_, { type }, form) => {
+        if (type === 'form') return null;
+        return (
+          <Select
+            showSearch
+            allowClear
+            placeholder="Select customer"
+            filterOption={false}
+            onSearch={async (v) => {
+              try {
+                const res = await listCustomers({
+                  search: v && v.trim().length > 0 ? v : '%',
+                });
+                const opts =
+                  res.data
+                    ?.map((c) => ({ label: c.name, value: c.name }))
+                    .filter(
+                      (o, idx, arr) =>
+                        arr.findIndex((x) => x.value === o.value) === idx,
+                    ) || [];
+                setCustomerOptions(opts);
+              } catch {
+                // ignore
+              }
+            }}
+            onChange={(val) => form?.setFieldValue?.('customerName', val)}
+            options={customerOptions}
+            style={{ width: '100%' }}
+          />
+        );
+      },
+      render: (_, record) => (
+        <a
+          onClick={async () => {
+            try {
+              const res = await listCustomers({
+                search: record.customerName || '%',
+              });
+              const match =
+                res.data?.find((c) => c.id === record.customerId) ||
+                res.data?.find((c) => c.name === record.customerName) ||
+                null;
+              setCustomerDetails(match || null);
+              setCustomerDrawerOpen(true);
+            } catch (err: any) {
+              message.error(err?.data?.message || 'Failed to load customer');
+            }
+          }}
+        >
+          {record.customerName}
+        </a>
+      ),
     },
     {
       title: 'Status',
       dataIndex: 'status',
       render: (_, record) => (
-        <Badge status={statusColors[record.status]} text={record.status} />
+        <Tag
+          color={
+            statusColors[record.status] === 'success'
+              ? 'green'
+              : statusColors[record.status] === 'processing'
+              ? 'blue'
+              : statusColors[record.status] === 'default'
+              ? 'default'
+              : statusColors[record.status] === 'warning'
+              ? 'orange'
+              : 'red'
+          }
+        >
+          {record.status}
+        </Tag>
       ),
       valueType: 'select',
       valueEnum: {
@@ -151,16 +247,20 @@ const OrdersPage: React.FC = () => {
       title: 'Net',
       dataIndex: 'totalNet',
       renderText: (val) => (val !== undefined ? money.format(val) : ''),
+      align: 'right',
     },
     {
       title: 'Gross',
       dataIndex: 'totalGross',
       renderText: (val) => (val !== undefined ? money.format(val) : ''),
+      align: 'right',
     },
     {
       title: 'Created At',
       dataIndex: 'createdAt',
       valueType: 'dateTime',
+      sorter: true,
+      defaultSortOrder: 'descend',
       hideInSearch: true,
     },
     {
@@ -181,6 +281,42 @@ const OrdersPage: React.FC = () => {
           >
             View
           </a>
+          {record.invoiceId ? (
+            <a
+              onClick={() => {
+                if (record.invoiceId) {
+                  openInvoicePdf(record.invoiceId);
+                }
+              }}
+            >
+              {record.invoiceNumber ? record.invoiceNumber : 'View Invoice'}
+            </a>
+          ) : (
+            <a
+              onClick={async () => {
+                try {
+                  await createFromOrder(record.id);
+                  message.success('Invoice created');
+                  actionRef.current?.reload();
+                } catch (err: any) {
+                  const msg =
+                    err?.data?.message ||
+                    err?.response?.data?.message ||
+                    err?.message ||
+                    'Invoice creation failed';
+                  message.error(msg);
+                }
+              }}
+              style={{
+                color:
+                  record.totalNet && record.totalNet > 0 ? undefined : 'gray',
+                pointerEvents:
+                  record.totalNet && record.totalNet > 0 ? 'auto' : 'none',
+              }}
+            >
+              Create Invoice
+            </a>
+          )}
           {record.status === 'DRAFT' && (
             <Popconfirm
               title="Delete this order?"
@@ -252,34 +388,126 @@ const OrdersPage: React.FC = () => {
 
   return (
     <PageContainer>
+      <div
+        style={{
+          margin: '0 0 12px',
+          padding: '10px 12px',
+          border: '1px solid #303030',
+          borderRadius: 6,
+          background: '#121212',
+        }}
+      >
+        <Space size={24} wrap>
+          <Typography.Text>
+            Draft: {tableData.filter((o) => o.status === 'DRAFT').length}
+          </Typography.Text>
+          <Typography.Text>
+            Confirmed:{' '}
+            {tableData.filter((o) => o.status === 'CONFIRMED').length}
+          </Typography.Text>
+          <Typography.Text>
+            Invoiced: {tableData.filter((o) => o.status === 'INVOICED').length}
+          </Typography.Text>
+          <Typography.Text>
+            Completed:{' '}
+            {tableData.filter((o) => o.status === 'COMPLETED').length}
+          </Typography.Text>
+          <Typography.Text strong>
+            Net total:{' '}
+            {money.format(
+              tableData.reduce((sum, o) => sum + (o.totalNet || 0), 0),
+            )}
+          </Typography.Text>
+          <Typography.Text strong>
+            Gross total:{' '}
+            {money.format(
+              tableData.reduce((sum, o) => sum + (o.totalGross || 0), 0),
+            )}
+          </Typography.Text>
+        </Space>
+      </div>
       <ProTable<OrderResponseDTO>
         rowKey="id"
         actionRef={actionRef}
+        formRef={formRef}
         columns={columns}
+        loading={tableLoading}
         search={{
           labelWidth: 90,
           span: 6,
         }}
+        locale={{ emptyText: 'No orders yet. Create your first order.' }}
         request={async (params) => {
+          setTableLoading(true);
           try {
-            const res = await listOrdersPaged({
-              q: params.keyword,
-              status: params.status,
-              customerId: filterCustomerId,
-              page: (params.current || 1) - 1,
-              size: params.pageSize || 10,
-              sort: undefined,
-            });
-            const data = res.data;
+            let data: OrderResponseDTO[] = [];
+
+            // If order number provided, try direct fetch (id or orderNumber)
+            if (params.orderNumber) {
+              const orderNo = params.orderNumber;
+              // try fetch by id
+              try {
+                const res = await getOrder(Number(orderNo));
+                if (res.data) {
+                  data = [res.data];
+                }
+              } catch {
+                data = [];
+              }
+            } else {
+              const res = await listOrdersPaged({
+                q: params.keyword || '%',
+                status: params.status,
+                customerId: filterCustomerId,
+                page: (params.current || 1) - 1,
+                size: params.pageSize || 10,
+                sort: undefined,
+              });
+              data = res.data?.content || [];
+            }
+
+            // client-side customer filter (case-insensitive)
+            if (params.customerName) {
+              const csearch = String(params.customerName).toLowerCase();
+              data = data.filter(
+                (o) =>
+                  o.customerName &&
+                  o.customerName.toLowerCase().includes(csearch),
+              );
+            }
+
+            // status already applied via server when using status filter, but enforce if coming from quick pills
+            if (params.status) {
+              data = data.filter((o) => o.status === params.status);
+            }
+
+            setTableData(data);
             return {
-              data: data?.content || [],
+              data,
               success: true,
-              total: data?.totalElements || 0,
+              total: data.length,
             };
           } catch (err: any) {
             message.error(err?.data?.message || 'Failed to load orders');
             return { data: [], success: false };
+          } finally {
+            setTableLoading(false);
           }
+        }}
+        onRow={(record) => {
+          const color =
+            record.status === 'COMPLETED'
+              ? '#52c41a'
+              : record.status === 'INVOICED' || record.status === 'CONFIRMED'
+              ? '#1677ff'
+              : record.status === 'DRAFT'
+              ? '#999'
+              : '#f5222d';
+          return {
+            style: {
+              borderLeft: `3px solid ${color}`,
+            },
+          };
         }}
         toolbar={{
           title: 'Orders',
@@ -300,6 +528,27 @@ const OrdersPage: React.FC = () => {
                 Clear Customer Filter
               </Button>
             ) : null,
+            <Segmented
+              key="quick-status"
+              options={['ALL', 'DRAFT', 'CONFIRMED', 'INVOICED', 'COMPLETED']}
+              value={statusQuickFilter}
+              onChange={(s) => {
+                const val = s as string;
+                setStatusQuickFilter(val);
+                if (val === 'ALL') {
+                  formRef.current?.setFieldsValue?.({
+                    status: undefined,
+                  });
+                  formRef.current?.submit?.();
+                } else {
+                  formRef.current?.setFieldsValue?.({
+                    status: val,
+                  });
+                  formRef.current?.submit?.();
+                }
+              }}
+              size="small"
+            />,
             <Button
               key="new"
               type="primary"
@@ -341,6 +590,11 @@ const OrdersPage: React.FC = () => {
           setSelectedOrder(undefined);
         }}
         title={`Order ${selectedOrder?.orderNumber || selectedOrder?.id || ''}`}
+        styles={{
+          body: {
+            paddingTop: 0,
+          },
+        }}
       >
         {selectedOrder && (
           <>
@@ -562,6 +816,16 @@ const OrdersPage: React.FC = () => {
                       background: '#1f1f1f',
                     }}
                   >
+                    Discount %
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'right',
+                      padding: '8px',
+                      borderBottom: '1px solid #303030',
+                      background: '#1f1f1f',
+                    }}
+                  >
                     Unit Net
                   </th>
                   <th
@@ -630,6 +894,15 @@ const OrdersPage: React.FC = () => {
                         textAlign: 'right',
                       }}
                     >
+                      {item.discountPercent ?? 0}
+                    </td>
+                    <td
+                      style={{
+                        padding: '8px',
+                        borderBottom: '1px solid #303030',
+                        textAlign: 'right',
+                      }}
+                    >
                       {item.unitPriceNet}
                     </td>
                     <td
@@ -685,6 +958,71 @@ const OrdersPage: React.FC = () => {
               </tbody>
             </table>
           </>
+        )}
+      </Drawer>
+
+      <Drawer
+        width={520}
+        open={customerDrawerOpen}
+        onClose={() => {
+          setCustomerDrawerOpen(false);
+          setCustomerDetails(null);
+        }}
+        title={`Customer: ${customerDetails?.name || ''}`}
+      >
+        {customerDetails ? (
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label="Name">
+              {customerDetails.name}
+            </Descriptions.Item>
+            <Descriptions.Item label="Email">
+              {customerDetails.email || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Phone">
+              {customerDetails.phone || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="City">
+              {customerDetails.city || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Country">
+              {customerDetails.countryCode || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Payment Terms (days)">
+              {customerDetails.paymentTermsDays ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="VAT ID">
+              {customerDetails.vatId || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Tax Number">
+              {customerDetails.taxNumber || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Address">
+              {customerDetails.street || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Postal Code">
+              {customerDetails.postalCode || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Notes">
+              {customerDetails.notes || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Orders">
+              <a
+                onClick={() => {
+                  history.push(
+                    `/billing/orders?customerId=${
+                      customerDetails.id
+                    }&customerName=${encodeURIComponent(
+                      customerDetails.name || '',
+                    )}`,
+                  );
+                }}
+              >
+                View orders for this customer
+              </a>
+            </Descriptions.Item>
+          </Descriptions>
+        ) : (
+          <div>No customer data.</div>
         )}
       </Drawer>
     </PageContainer>

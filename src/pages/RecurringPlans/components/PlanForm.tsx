@@ -66,10 +66,22 @@ const PlanForm: React.FC<Props> = ({
       const name = values?.tempItemName;
       const unit = values?.tempItemUnit;
       if (!priceListItemId || !qty) return;
-      setItems((prev) => [
-        ...prev,
-        { priceListItemId, quantity: qty, name, unit },
-      ]);
+      setItems((prev) => {
+        const matchIndex = prev.findIndex(
+          (item) => item.priceListItemId === priceListItemId,
+        );
+        if (matchIndex >= 0) {
+          const updated = [...prev];
+          const current = updated[matchIndex];
+          updated[matchIndex] = {
+            ...current,
+            quantity: (current.quantity || 0) + qty,
+          };
+          message.success('Quantity updated');
+          return updated;
+        }
+        return [...prev, { priceListItemId, quantity: qty, name, unit }];
+      });
       formRef.current?.setFieldsValue({
         tempItemId: undefined,
         tempItemName: undefined,
@@ -269,8 +281,8 @@ const PlanForm: React.FC<Props> = ({
           <ProFormDigit
             name="tempQty"
             label="Quantity"
-            min={0.1}
-            fieldProps={{ step: 0.1 }}
+            min={1}
+            fieldProps={{ step: 1, precision: 0 }}
             rules={[{ required: true, message: 'Enter quantity' }]}
           />
           <Button type="dashed" onClick={handleAddItem}>

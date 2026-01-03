@@ -1,11 +1,6 @@
 import { request } from '@umijs/max';
 
-export type OrderStatus =
-  | 'DRAFT'
-  | 'CONFIRMED'
-  | 'INVOICED'
-  | 'COMPLETED'
-  | 'CANCELLED';
+export type OrderStatus = 'DRAFT' | 'INVOICED';
 
 export interface OrderItemDTO {
   id?: number;
@@ -116,6 +111,20 @@ export async function addItem(orderId: number, data: any) {
     `/api/orders/${orderId}/items`,
     {
       method: 'POST',
+      data,
+    },
+  );
+}
+
+export async function updateItem(
+  orderId: number,
+  itemId: number,
+  data: Partial<OrderItemDTO>,
+) {
+  return request<ApiResponse<OrderResponseDTO>>(
+    `/api/orders/${orderId}/items/${itemId}`,
+    {
+      method: 'PUT',
       data,
     },
   );

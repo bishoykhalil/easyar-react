@@ -9,6 +9,7 @@ export interface SettingsDTO {
   vatId?: string;
   taxNumber?: string;
   defaultVatRate?: number;
+  lateFeeAmount?: number;
   currency?: string;
   invoiceNumberFormat?: string;
   quoteNumberFormat?: string;

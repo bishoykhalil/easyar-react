@@ -1,6 +1,6 @@
 import { request } from '@umijs/max';
 
-export type InvoiceStatus = 'DRAFT' | 'ISSUED' | 'PAID' | 'CANCELLED';
+export type InvoiceStatus = 'ISSUED' | 'SENT' | 'PAID' | 'RETURNED' | 'OVERDUE';
 
 export interface InvoiceItemDTO {
   name?: string;
@@ -23,18 +23,26 @@ export interface InvoiceResponseDTO {
   status: InvoiceStatus;
   recurring?: boolean;
   recurringPlanId?: number;
+  reminderForInvoiceId?: number;
   currency?: string;
   totalNet?: number;
   totalVat?: number;
   totalGross?: number;
   issuedAt?: string;
+  sentAt?: string;
   paidAt?: string;
+  returnedAt?: string;
+  overdueAt?: string;
   dueDate?: string;
   paymentTermsDays?: number;
   overdue?: boolean;
   daysOverdue?: number;
   items?: InvoiceItemDTO[];
   createdAt?: string;
+}
+
+export interface InvoiceUpdateRequest {
+  items: InvoiceItemDTO[];
 }
 
 export interface PaginatedResponse<T> {
@@ -94,6 +102,22 @@ export async function updateInvoiceStatus(id: number, status: InvoiceStatus) {
     {
       method: 'PATCH',
       data: { status },
+    },
+  );
+}
+
+export async function updateInvoice(id: number, data: InvoiceUpdateRequest) {
+  return request<ApiResponse<InvoiceResponseDTO>>(`/api/invoices/${id}`, {
+    method: 'PUT',
+    data,
+  });
+}
+
+export async function createReminderInvoice(id: number) {
+  return request<ApiResponse<InvoiceResponseDTO>>(
+    `/api/invoices/${id}/reminder`,
+    {
+      method: 'POST',
     },
   );
 }

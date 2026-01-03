@@ -7,7 +7,7 @@ import {
   getOrder,
   listOrdersPaged,
   removeItem,
-  updateStatus,
+  updateItem,
   type OrderResponseDTO,
   type OrderStatus,
 } from '@/services/orders';
@@ -43,10 +43,7 @@ const statusColors: Record<
   'processing' | 'success' | 'default' | 'warning' | 'error'
 > = {
   DRAFT: 'default',
-  CONFIRMED: 'processing',
   INVOICED: 'processing',
-  COMPLETED: 'success',
-  CANCELLED: 'error',
 };
 
 const OrdersPage: React.FC = () => {
@@ -237,10 +234,7 @@ const OrdersPage: React.FC = () => {
       valueType: 'select',
       valueEnum: {
         DRAFT: { text: 'DRAFT' },
-        CONFIRMED: { text: 'CONFIRMED' },
         INVOICED: { text: 'INVOICED' },
-        COMPLETED: { text: 'COMPLETED' },
-        CANCELLED: { text: 'CANCELLED' },
       },
     },
     {
@@ -266,100 +260,109 @@ const OrdersPage: React.FC = () => {
     {
       title: 'Actions',
       valueType: 'option',
-      render: (_, record) => (
-        <Space>
-          <a
-            onClick={async () => {
-              try {
-                const res = await getOrder(record.id);
-                setSelectedOrder(res.data);
-                setDrawerOpen(true);
-              } catch (err: any) {
-                message.error(err?.data?.message || 'Failed to load order');
-              }
-            }}
-          >
-            View
-          </a>
-          {record.invoiceId ? (
-            <a
-              onClick={() => {
-                if (record.invoiceId) {
-                  openInvoicePdf(record.invoiceId);
-                }
-              }}
-            >
-              {record.invoiceNumber ? record.invoiceNumber : 'View Invoice'}
-            </a>
-          ) : (
+      render: (_, record) => {
+        const canCreateInvoice =
+          record.status === 'DRAFT' && (record.totalNet || 0) > 0;
+        return (
+          <Space>
             <a
               onClick={async () => {
                 try {
-                  await createFromOrder(record.id);
-                  message.success('Invoice created');
-                  actionRef.current?.reload();
+                  const res = await getOrder(record.id);
+                  setSelectedOrder(res.data);
+                  setDrawerOpen(true);
                 } catch (err: any) {
-                  const msg =
-                    err?.data?.message ||
-                    err?.response?.data?.message ||
-                    err?.message ||
-                    'Invoice creation failed';
-                  message.error(msg);
+                  message.error(err?.data?.message || 'Failed to load order');
                 }
               }}
-              style={{
-                color:
-                  record.totalNet && record.totalNet > 0 ? undefined : 'gray',
-                pointerEvents:
-                  record.totalNet && record.totalNet > 0 ? 'auto' : 'none',
-              }}
             >
-              Create Invoice
+              View
             </a>
-          )}
-          {record.status === 'DRAFT' && (
-            <Popconfirm
-              title="Delete this order?"
-              onConfirm={async () => {
-                try {
-                  await deleteOrder(record.id);
-                  message.success('Deleted');
-                  actionRef.current?.reload();
-                } catch (err: any) {
-                  message.error(err?.data?.message || 'Delete failed');
-                }
-              }}
-            >
-              <a style={{ color: 'red' }}>Delete</a>
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+            {record.invoiceId ? (
+              <a
+                onClick={() => {
+                  if (record.invoiceId) {
+                    openInvoicePdf(record.invoiceId);
+                  }
+                }}
+              >
+                {record.invoiceNumber ? record.invoiceNumber : 'View Invoice'}
+              </a>
+            ) : (
+              <a
+                onClick={async () => {
+                  if (!canCreateInvoice) return;
+                  try {
+                    await createFromOrder(record.id);
+                    message.success('Invoice created');
+                    actionRef.current?.reload();
+                  } catch (err: any) {
+                    const msg =
+                      err?.data?.message ||
+                      err?.response?.data?.message ||
+                      err?.message ||
+                      'Invoice creation failed';
+                    message.error(msg);
+                  }
+                }}
+                style={{
+                  color: canCreateInvoice ? undefined : 'gray',
+                  pointerEvents: canCreateInvoice ? 'auto' : 'none',
+                }}
+              >
+                Create Invoice
+              </a>
+            )}
+            {record.status === 'DRAFT' && (
+              <Popconfirm
+                title="Delete this order?"
+                onConfirm={async () => {
+                  try {
+                    await deleteOrder(record.id);
+                    message.success('Deleted');
+                    actionRef.current?.reload();
+                  } catch (err: any) {
+                    message.error(err?.data?.message || 'Delete failed');
+                  }
+                }}
+              >
+                <a style={{ color: 'red' }}>Delete</a>
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      },
     },
   ];
-
-  const handleStatusChange = async (orderId: number, status: OrderStatus) => {
-    try {
-      const res = await updateStatus(orderId, status);
-      message.success('Status updated');
-      setSelectedOrder(res.data);
-      actionRef.current?.reload();
-    } catch (err: any) {
-      const msg =
-        err?.data?.message ||
-        err?.response?.data?.message ||
-        err?.message ||
-        'Status update failed';
-      message.error(msg);
-    }
-  };
 
   const handleAddItem = async (values: any) => {
     if (!selectedOrder) return false;
     try {
       setAdding(true);
-      const payload: any = { ...values };
       const opt = priceOptions.find((p) => p.value === values.priceListItemId);
+      const qtyToAdd = Number(values?.quantity || 0);
+      const existingItem = selectedOrder.items?.find((item) => {
+        if (values.priceListItemId && item.priceListItemId) {
+          return item.priceListItemId === values.priceListItemId;
+        }
+        return (
+          opt?.data &&
+          item.name === opt.data.name &&
+          item.unit === opt.data.unit
+        );
+      });
+
+      if (existingItem?.id && qtyToAdd > 0) {
+        const res = await updateItem(selectedOrder.id, existingItem.id, {
+          quantity: (existingItem.quantity || 0) + qtyToAdd,
+        });
+        message.success('Quantity updated');
+        setSelectedOrder(res.data);
+        actionRef.current?.reload();
+        itemForm.resetFields();
+        return true;
+      }
+      const payload: any = { ...values };
       if (opt?.data) {
         payload.name = opt.data.name;
         payload.description = opt.data.description;
@@ -386,6 +389,9 @@ const OrdersPage: React.FC = () => {
     }
   };
 
+  const canCreateInvoice =
+    selectedOrder?.status === 'DRAFT' && (selectedOrder.items?.length ?? 0) > 0;
+
   return (
     <PageContainer>
       <div
@@ -402,15 +408,7 @@ const OrdersPage: React.FC = () => {
             Draft: {tableData.filter((o) => o.status === 'DRAFT').length}
           </Typography.Text>
           <Typography.Text>
-            Confirmed:{' '}
-            {tableData.filter((o) => o.status === 'CONFIRMED').length}
-          </Typography.Text>
-          <Typography.Text>
             Invoiced: {tableData.filter((o) => o.status === 'INVOICED').length}
-          </Typography.Text>
-          <Typography.Text>
-            Completed:{' '}
-            {tableData.filter((o) => o.status === 'COMPLETED').length}
           </Typography.Text>
           <Typography.Text strong>
             Net total:{' '}
@@ -495,14 +493,7 @@ const OrdersPage: React.FC = () => {
           }
         }}
         onRow={(record) => {
-          const color =
-            record.status === 'COMPLETED'
-              ? '#52c41a'
-              : record.status === 'INVOICED' || record.status === 'CONFIRMED'
-              ? '#1677ff'
-              : record.status === 'DRAFT'
-              ? '#999'
-              : '#f5222d';
+          const color = record.status === 'INVOICED' ? '#1677ff' : '#999';
           return {
             style: {
               borderLeft: `3px solid ${color}`,
@@ -530,7 +521,7 @@ const OrdersPage: React.FC = () => {
             ) : null,
             <Segmented
               key="quick-status"
-              options={['ALL', 'DRAFT', 'CONFIRMED', 'INVOICED', 'COMPLETED']}
+              options={['ALL', 'DRAFT', 'INVOICED']}
               value={statusQuickFilter}
               onChange={(s) => {
                 const val = s as string;
@@ -603,57 +594,10 @@ const OrdersPage: React.FC = () => {
                 {selectedOrder.customerName}
               </Descriptions.Item>
               <Descriptions.Item label="Status">
-                <Space>
-                  <Badge
-                    status={statusColors[selectedOrder.status]}
-                    text={selectedOrder.status}
-                  />
-                  {selectedOrder.status === 'DRAFT' && (
-                    <Space size={4}>
-                      <a
-                        onClick={() =>
-                          handleStatusChange(selectedOrder.id, 'CONFIRMED')
-                        }
-                      >
-                        Confirm
-                      </a>
-                    </Space>
-                  )}
-                  {selectedOrder.status === 'CONFIRMED' && (
-                    <Space size={4}>
-                      <a
-                        onClick={() =>
-                          handleStatusChange(selectedOrder.id, 'INVOICED')
-                        }
-                      >
-                        Mark Invoiced
-                      </a>
-                    </Space>
-                  )}
-                  {selectedOrder.status === 'INVOICED' && (
-                    <Space size={4}>
-                      <a
-                        onClick={() =>
-                          handleStatusChange(selectedOrder.id, 'COMPLETED')
-                        }
-                      >
-                        Complete
-                      </a>
-                    </Space>
-                  )}
-                  {(selectedOrder.status === 'DRAFT' ||
-                    selectedOrder.status === 'CONFIRMED') && (
-                    <Space size={4}>
-                      <a
-                        onClick={() =>
-                          handleStatusChange(selectedOrder.id, 'CANCELLED')
-                        }
-                      >
-                        Cancel
-                      </a>
-                    </Space>
-                  )}
-                </Space>
+                <Badge
+                  status={statusColors[selectedOrder.status]}
+                  text={selectedOrder.status}
+                />
               </Descriptions.Item>
               <Descriptions.Item label="Invoice">
                 {selectedOrder.invoiceId ? (
@@ -667,7 +611,7 @@ const OrdersPage: React.FC = () => {
                   <Button
                     type="link"
                     size="small"
-                    disabled={selectedOrder.status !== 'CONFIRMED'}
+                    disabled={!canCreateInvoice}
                     onClick={async () => {
                       try {
                         await createFromOrder(selectedOrder.id);
@@ -686,9 +630,11 @@ const OrdersPage: React.FC = () => {
                       }
                     }}
                   >
-                    {selectedOrder.status === 'CONFIRMED'
+                    {selectedOrder.status !== 'DRAFT'
+                      ? 'Order already invoiced'
+                      : canCreateInvoice
                       ? 'Create Invoice'
-                      : 'Confirm order to invoice'}
+                      : 'Add items to invoice'}
                   </Button>
                 )}
               </Descriptions.Item>
@@ -753,7 +699,12 @@ const OrdersPage: React.FC = () => {
                     rules={[{ required: true, message: 'Qty required' }]}
                     style={{ margin: 0, width: 150 }}
                   >
-                    <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
+                    <InputNumber
+                      min={1}
+                      step={1}
+                      precision={0}
+                      style={{ width: '100%' }}
+                    />
                   </Form.Item>
                   <Form.Item
                     name="discountPercent"

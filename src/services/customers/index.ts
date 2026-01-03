@@ -42,6 +42,12 @@ export async function listCustomers(params: { search?: string }) {
   });
 }
 
+export async function getCustomer(id: number) {
+  return request<ApiResponse<CustomerDTO>>(`/api/customers/${id}`, {
+    method: 'GET',
+  });
+}
+
 export async function createCustomer(data: CustomerDTO) {
   return request<ApiResponse<CustomerDTO>>('/api/customers', {
     method: 'POST',

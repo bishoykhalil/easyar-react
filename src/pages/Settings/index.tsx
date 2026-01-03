@@ -147,6 +147,15 @@ const SettingsPage: React.FC = () => {
                 placeholder="0.19"
                 colProps={{ span: 8 }}
               />
+              <ProFormDigit
+                name="lateFeeAmount"
+                label="Late Fee Amount"
+                min={0}
+                fieldProps={{ step: 0.01 }}
+                tooltip="Fixed net fee added to reminder invoices"
+                placeholder="0.00"
+                colProps={{ span: 8 }}
+              />
             </ProFormGroup>
           </ProCard>
 

@@ -1,3 +1,40 @@
 .container {
-  padding-top: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  background: #1f1f1f;
+  border-color: #303030;
+}
+
+.card :global(.ant-card-head) {
+  border-bottom: 1px solid #303030;
+}
+
+.kpiLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9ca3af;
+}
+
+.kpiValue {
+  margin: 0;
+}
+
+.table :global(.ant-table) {
+  background: transparent;
+}
+
+.table :global(.ant-table-thead > tr > th) {
+  background: #1b1b1b;
+  border-bottom: 1px solid #303030;
+  color: #e5e7eb;
+}
+
+.table :global(.ant-table-tbody > tr > td) {
+  background: transparent;
+  border-bottom: 1px solid #2a2a2a;
 }

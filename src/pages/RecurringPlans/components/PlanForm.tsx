@@ -28,13 +28,19 @@ const PlanForm: React.FC<Props> = ({
   const formRef = useRef<any>();
   const [items, setItems] = useState<
     {
-      priceListItemId: number;
+      priceListItemId?: number;
       quantity: number;
       name?: string;
+      description?: string;
       unit?: string;
+      unitPriceNet?: number;
+      vatRate?: number;
+      discountPercent?: number;
     }[]
   >([]);
+  const isEditing = Boolean(initialValues?.id);
   const hasUnlinkedItems = items.some((item) => !item.priceListItemId);
+  const itemsReadOnly = isEditing || hasUnlinkedItems;
 
   useEffect(() => {
     if (open) {
@@ -42,21 +48,28 @@ const PlanForm: React.FC<Props> = ({
         priceListItemId: it.priceListItemId,
         quantity: it.quantity || 1,
         name: it.name,
+        description: it.description,
         unit: it.unit,
+        unitPriceNet: it.unitPriceNet,
+        vatRate: it.vatRate,
+        discountPercent: it.discountPercent ?? 0,
       }));
       setItems(mapped);
       formRef.current?.setFieldsValue({
         tempItemId: undefined,
         tempItemName: undefined,
         tempItemUnit: undefined,
+        tempItemDescription: undefined,
+        tempItemUnitPriceNet: undefined,
+        tempItemVatRate: undefined,
         tempQty: undefined,
       });
     }
   }, [open, initialValues]);
 
   const handleAddItem = async () => {
-    if (hasUnlinkedItems) {
-      message.warning('Items from invoice are read-only');
+    if (itemsReadOnly) {
+      message.warning('Items are read-only for existing plans');
       return;
     }
     try {
@@ -68,6 +81,15 @@ const PlanForm: React.FC<Props> = ({
       const qty = values?.tempQty;
       const name = values?.tempItemName;
       const unit = values?.tempItemUnit;
+      const description = values?.tempItemDescription;
+      const unitPriceNet =
+        values?.tempItemUnitPriceNet !== undefined
+          ? Number(values?.tempItemUnitPriceNet)
+          : undefined;
+      const vatRate =
+        values?.tempItemVatRate !== undefined
+          ? Number(values?.tempItemVatRate)
+          : undefined;
       if (!priceListItemId || !qty) return;
       setItems((prev) => {
         const matchIndex = prev.findIndex(
@@ -83,12 +105,27 @@ const PlanForm: React.FC<Props> = ({
           message.success('Quantity updated');
           return updated;
         }
-        return [...prev, { priceListItemId, quantity: qty, name, unit }];
+        return [
+          ...prev,
+          {
+            priceListItemId,
+            quantity: qty,
+            name,
+            description,
+            unit,
+            unitPriceNet,
+            vatRate,
+            discountPercent: 0,
+          },
+        ];
       });
       formRef.current?.setFieldsValue({
         tempItemId: undefined,
         tempItemName: undefined,
         tempItemUnit: undefined,
+        tempItemDescription: undefined,
+        tempItemUnitPriceNet: undefined,
+        tempItemVatRate: undefined,
         tempQty: undefined,
       });
     } catch {
@@ -225,8 +262,10 @@ const PlanForm: React.FC<Props> = ({
         Items
       </Typography.Title>
       <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
-        {hasUnlinkedItems
-          ? 'Items were created from an invoice and are read-only here.'
+        {itemsReadOnly
+          ? hasUnlinkedItems
+            ? 'Items were created from an invoice and are read-only here.'
+            : 'Items are read-only for existing plans.'
           : 'Select a price list item, set quantity, and click Add. Prices/VAT will follow the selected item.'}
       </Typography.Paragraph>
 
@@ -236,96 +275,175 @@ const PlanForm: React.FC<Props> = ({
           borderRadius: 6,
           padding: 12,
           width: '100%',
+          overflowX: 'auto',
         }}
       >
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 120px 100px',
-            gap: 12,
-            alignItems: 'end',
-          }}
-        >
-          <ProFormSelect
-            name="tempItemId"
-            label="Price List Item"
-            rules={[{ required: true, message: 'Select item' }]}
-            showSearch
-            debounceTime={300}
-            disabled={hasUnlinkedItems}
-            request={async ({ keyWords }) => {
-              try {
-                const res = await listPriceItemsPaged({
-                  q: keyWords && keyWords.length > 0 ? keyWords : '%',
-                  page: 0,
-                  size: 20,
-                });
-                return (
-                  res.data?.content?.map((p) => ({
-                    label: p.name || '',
-                    value: p.id!,
-                    unit: p.unit,
-                    name: p.name || '',
-                  })) || []
-                );
-              } catch {
-                return [];
-              }
+        {!itemsReadOnly && (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 120px 100px',
+              gap: 12,
+              alignItems: 'end',
             }}
-            fieldProps={{
-              onSelect: (_val, option: any) => {
-                formRef.current?.setFieldsValue({
-                  tempItemName: option?.name,
-                  tempItemUnit: option?.unit,
-                });
-              },
-            }}
-          />
-          <ProFormText name="tempItemName" hidden />
-          <ProFormText name="tempItemUnit" hidden />
-          <ProFormDigit
-            name="tempQty"
-            label="Quantity"
-            min={1}
-            fieldProps={{ step: 1, precision: 0 }}
-            rules={[{ required: true, message: 'Enter quantity' }]}
-            disabled={hasUnlinkedItems}
-          />
-          <Button
-            type="dashed"
-            onClick={handleAddItem}
-            disabled={hasUnlinkedItems}
           >
-            Add
-          </Button>
-        </div>
+            <ProFormSelect
+              name="tempItemId"
+              label="Price List Item"
+              rules={[{ required: true, message: 'Select item' }]}
+              showSearch
+              debounceTime={300}
+              disabled={itemsReadOnly}
+              request={async ({ keyWords }) => {
+                try {
+                  const res = await listPriceItemsPaged({
+                    q: keyWords && keyWords.length > 0 ? keyWords : '%',
+                    page: 0,
+                    size: 20,
+                  });
+                  return (
+                    res.data?.content?.map((p) => ({
+                      label: p.name || '',
+                      value: p.id!,
+                      unit: p.unit,
+                      name: p.name || '',
+                      description: p.description || '',
+                      unitPriceNet: p.priceNet,
+                      vatRate: p.vatRate,
+                    })) || []
+                  );
+                } catch {
+                  return [];
+                }
+              }}
+              fieldProps={{
+                onSelect: (_val, option: any) => {
+                  formRef.current?.setFieldsValue({
+                    tempItemName: option?.name,
+                    tempItemUnit: option?.unit,
+                    tempItemDescription: option?.description,
+                    tempItemUnitPriceNet: option?.unitPriceNet,
+                    tempItemVatRate: option?.vatRate,
+                  });
+                },
+              }}
+            />
+            <ProFormText name="tempItemName" hidden />
+            <ProFormText name="tempItemUnit" hidden />
+            <ProFormText name="tempItemDescription" hidden />
+            <ProFormText name="tempItemUnitPriceNet" hidden />
+            <ProFormText name="tempItemVatRate" hidden />
+            <ProFormDigit
+              name="tempQty"
+              label="Quantity"
+              min={1}
+              fieldProps={{ step: 1, precision: 0 }}
+              rules={[{ required: true, message: 'Enter quantity' }]}
+              disabled={itemsReadOnly}
+            />
+            <Button
+              type="dashed"
+              onClick={handleAddItem}
+              disabled={itemsReadOnly}
+            >
+              Add
+            </Button>
+          </div>
+        )}
         <Table
           size="small"
           style={{ marginTop: 12 }}
           pagination={false}
+          scroll={{ x: 'max-content' }}
           dataSource={items.map((it, idx) => ({ key: idx, ...it }))}
           columns={[
-            { title: 'Item', dataIndex: 'name' },
-            { title: 'Unit', dataIndex: 'unit', width: 100 },
+            { title: 'Item', dataIndex: 'name', width: 140 },
+            {
+              title: 'Description',
+              dataIndex: 'description',
+              ellipsis: true,
+            },
+            { title: 'Unit', dataIndex: 'unit', width: 90 },
             {
               title: 'Quantity',
               dataIndex: 'quantity',
-              render: (val, record) => `${val} ${record.unit || ''}`,
+              width: 90,
+              render: (val) => val ?? '-',
             },
             {
-              title: '',
-              width: 60,
-              render: (_: any, __: any, index: number) => (
-                <a
-                  style={{ color: hasUnlinkedItems ? '#555' : 'red' }}
-                  onClick={() => {
-                    if (!hasUnlinkedItems) handleRemoveItem(index);
-                  }}
-                >
-                  {hasUnlinkedItems ? '' : 'Remove'}
-                </a>
-              ),
+              title: 'Unit Net',
+              dataIndex: 'unitPriceNet',
+              width: 110,
+              render: (val) =>
+                typeof val === 'number' ? `EUR ${val.toFixed(2)}` : '-',
             },
+            {
+              title: 'VAT',
+              dataIndex: 'vatRate',
+              width: 90,
+              render: (val) =>
+                typeof val === 'number'
+                  ? `${(val * 100).toFixed(2).replace(/\\.00$/, '')}%`
+                  : '-',
+            },
+            {
+              title: 'Discount %',
+              dataIndex: 'discountPercent',
+              width: 110,
+              render: (val) =>
+                typeof val === 'number'
+                  ? `${val.toFixed(2).replace(/\\.00$/, '')}%`
+                  : '0%',
+            },
+            {
+              title: 'Net',
+              width: 110,
+              render: (_val, record) => {
+                if (
+                  typeof record.unitPriceNet !== 'number' ||
+                  typeof record.quantity !== 'number'
+                ) {
+                  return '-';
+                }
+                const discount = record.discountPercent ?? 0;
+                const net =
+                  record.unitPriceNet * record.quantity * (1 - discount / 100);
+                return `EUR ${net.toFixed(2)}`;
+              },
+            },
+            {
+              title: 'Gross',
+              width: 110,
+              render: (_val, record) => {
+                if (
+                  typeof record.unitPriceNet !== 'number' ||
+                  typeof record.quantity !== 'number'
+                ) {
+                  return '-';
+                }
+                const discount = record.discountPercent ?? 0;
+                const net =
+                  record.unitPriceNet * record.quantity * (1 - discount / 100);
+                const vat = record.vatRate ?? 0;
+                return `EUR ${(net * (1 + vat)).toFixed(2)}`;
+              },
+            },
+            ...(!itemsReadOnly
+              ? [
+                  {
+                    title: '',
+                    width: 70,
+                    render: (_: any, __: any, index: number) => (
+                      <a
+                        style={{ color: 'red' }}
+                        onClick={() => handleRemoveItem(index)}
+                      >
+                        Remove
+                      </a>
+                    ),
+                  },
+                ]
+              : []),
           ]}
         />
       </div>

@@ -1,4 +1,10 @@
+import {
+  listInvoicesPaged,
+  type InvoiceResponseDTO,
+} from '@/services/invoices';
+import { listPlans, type RecurringPlanDTO } from '@/services/recurring';
 import { PageContainer } from '@ant-design/pro-components';
+import { history } from '@umijs/max';
 import {
   Button,
   Card,
@@ -10,6 +16,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
+import React, { useEffect, useMemo, useState } from 'react';
 import styles from './index.less';
 
 const HomePage: React.FC = () => {
@@ -18,103 +25,202 @@ const HomePage: React.FC = () => {
     currency: 'EUR',
   });
 
-  const kpis = [
-    {
-      title: 'Open invoices',
-      value: '12',
-      note: '3 due this week',
-    },
-    {
-      title: 'Overdue amount',
-      value: money.format(2840.5),
-      note: '2 invoices overdue',
-    },
-    {
-      title: 'Recurring revenue',
-      value: money.format(19832.97),
-      note: 'This month',
-    },
-    {
-      title: 'Active plans',
-      value: '9',
-      note: '2 paused, 1 expiring',
-    },
-  ];
+  const [invoices, setInvoices] = useState<InvoiceResponseDTO[]>([]);
+  const [plans, setPlans] = useState<RecurringPlanDTO[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [loadingPlans, setLoadingPlans] = useState(false);
 
-  const upcomingRuns = [
-    {
-      key: 1,
-      plan: 'Monthly Visit',
-      customer: 'BOCH',
-      nextRun: '2026-01-05',
-      amount: money.format(114),
-      status: 'ACTIVE',
-    },
-    {
-      key: 2,
-      plan: 'Maintenance',
-      customer: 'NPM',
-      nextRun: '2026-01-08',
-      amount: money.format(990),
-      status: 'ACTIVE',
-    },
-    {
-      key: 3,
-      plan: 'Quarterly Review',
-      customer: 'OPL',
-      nextRun: '2026-01-12',
-      amount: money.format(300),
-      status: 'PAUSED',
-    },
-  ];
+  useEffect(() => {
+    const load = async () => {
+      setLoadingInvoices(true);
+      setLoadingPlans(true);
+      try {
+        const res = await listInvoicesPaged({
+          q: '%',
+          page: 0,
+          size: 200,
+          sort: 'createdAt,desc',
+        });
+        setInvoices(res.data?.content || []);
+      } catch {
+        setInvoices([]);
+      } finally {
+        setLoadingInvoices(false);
+      }
+      try {
+        const res = await listPlans();
+        setPlans(res.data || []);
+      } catch {
+        setPlans([]);
+      } finally {
+        setLoadingPlans(false);
+      }
+    };
+    load();
+  }, []);
 
-  const openInvoices = [
-    {
-      key: 1,
-      invoice: 'R-2026-0018',
-      customer: 'BOCH',
-      status: 'ISSUED',
-      dueDate: '2026-01-17',
-      amount: money.format(114),
-    },
-    {
-      key: 2,
-      invoice: 'R-2026-0016',
-      customer: 'NPM',
-      status: 'SENT',
-      dueDate: '2026-01-09',
-      amount: money.format(1980),
-    },
-    {
-      key: 3,
-      invoice: 'R-2026-0015',
-      customer: 'MARIA',
-      status: 'OVERDUE',
-      dueDate: '2026-01-08',
-      amount: money.format(4906),
-    },
-  ];
+  const parseDate = (value?: string) => (value ? new Date(value) : null);
 
-  const alerts = [
-    {
-      key: 1,
-      title: 'Recurring run failed',
-      detail: 'Plan #12 missing items (NPM)',
-      tone: 'error',
-    },
-    {
-      key: 2,
-      title: 'Payment terms missing',
-      detail: 'Customer: CCCC',
-      tone: 'warning',
-    },
-    {
-      key: 3,
-      title: 'Plan expiring soon',
-      detail: 'BOCH - 1 run remaining',
-      tone: 'info',
-    },
-  ];
+  const kpis = useMemo(() => {
+    const openStatuses = ['ISSUED', 'SENT', 'RETURNED', 'OVERDUE'];
+    const open = invoices.filter((inv) => openStatuses.includes(inv.status));
+    const overdue = invoices.filter(
+      (inv) => inv.overdue || inv.status === 'OVERDUE',
+    );
+    const now = new Date();
+    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const dueSoon = open.filter((inv) => {
+      const due = parseDate(inv.dueDate);
+      return due && due >= now && due <= in7Days;
+    });
+
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
+    const recurringThisMonth = invoices.filter((inv) => {
+      if (!inv.recurring) return false;
+      const date = parseDate(inv.issuedAt || inv.createdAt);
+      return date ? date >= startOfMonth && date <= endOfMonth : false;
+    });
+    const recurringTotal = recurringThisMonth.reduce(
+      (sum, inv) => sum + (inv.totalGross || 0),
+      0,
+    );
+
+    const activePlans = plans.filter((p) => p.status === 'ACTIVE' || p.active);
+    const pausedPlans = plans.filter(
+      (p) =>
+        p.status === 'PAUSED' || (p.active === false && p.status !== 'EXPIRED'),
+    );
+    const expiringPlans = plans.filter((p) => {
+      const remaining =
+        p.remainingOccurrences ?? p.maxOccurrences - p.generatedCount;
+      return remaining <= 1 && remaining >= 0;
+    });
+
+    return [
+      {
+        title: 'Open invoices',
+        value: String(open.length),
+        note: `${dueSoon.length} due this week`,
+      },
+      {
+        title: 'Overdue amount',
+        value: money.format(
+          overdue.reduce((sum, inv) => sum + (inv.totalGross || 0), 0),
+        ),
+        note: `${overdue.length} invoices overdue`,
+      },
+      {
+        title: 'Recurring revenue',
+        value: money.format(recurringTotal),
+        note: 'This month',
+      },
+      {
+        title: 'Active plans',
+        value: String(activePlans.length),
+        note: `${pausedPlans.length} paused, ${expiringPlans.length} expiring`,
+      },
+    ];
+  }, [invoices, plans, money]);
+
+  const upcomingRuns = useMemo(() => {
+    const activePlans = plans.filter((p) => p.status === 'ACTIVE' || p.active);
+    const sorted = [...activePlans].sort((a, b) => {
+      const aDate = parseDate(a.nextRunDate)?.getTime() || 0;
+      const bDate = parseDate(b.nextRunDate)?.getTime() || 0;
+      return aDate - bDate;
+    });
+    const calcAmount = (plan: RecurringPlanDTO) => {
+      return plan.items.reduce((sum, item) => {
+        const qty = item.quantity || 0;
+        const unit = item.unitPriceNet || 0;
+        const discount = item.discountPercent || 0;
+        const net = qty * unit * (1 - discount / 100);
+        const vat = net * (item.vatRate || 0);
+        return sum + net + vat;
+      }, 0);
+    };
+    return sorted.slice(0, 5).map((plan) => ({
+      key: plan.id,
+      plan: `Plan #${plan.id}`,
+      customer: plan.customerName,
+      nextRun: plan.nextRunDate,
+      amount: money.format(calcAmount(plan)),
+      status: plan.status || (plan.active ? 'ACTIVE' : 'PAUSED'),
+    }));
+  }, [plans, money]);
+
+  const openInvoices = useMemo(() => {
+    const openStatuses = ['ISSUED', 'SENT', 'RETURNED', 'OVERDUE'];
+    const open = invoices.filter((inv) => openStatuses.includes(inv.status));
+    const sorted = [...open].sort((a, b) => {
+      const aDate = parseDate(a.dueDate)?.getTime() || 0;
+      const bDate = parseDate(b.dueDate)?.getTime() || 0;
+      return aDate - bDate;
+    });
+    return sorted.slice(0, 5).map((inv) => ({
+      key: inv.id,
+      invoice: inv.invoiceNumber || `#${inv.id}`,
+      customer: inv.customerName,
+      status: inv.status,
+      dueDate: inv.dueDate || '-',
+      amount: money.format(inv.totalGross || 0),
+    }));
+  }, [invoices, money]);
+
+  const alerts = useMemo(() => {
+    const items: {
+      key: number;
+      title: string;
+      detail: string;
+      tone: string;
+    }[] = [];
+    const overdue = invoices.filter(
+      (inv) => inv.overdue || inv.status === 'OVERDUE',
+    );
+    if (overdue.length) {
+      items.push({
+        key: 1,
+        title: 'Overdue invoices',
+        detail: `${overdue.length} invoices need attention`,
+        tone: 'error',
+      });
+    }
+    const paused = plans.filter(
+      (p) =>
+        p.status === 'PAUSED' || (p.active === false && p.status !== 'EXPIRED'),
+    );
+    if (paused.length) {
+      items.push({
+        key: 2,
+        title: 'Plans paused',
+        detail: `${paused.length} recurring plans are paused`,
+        tone: 'warning',
+      });
+    }
+    const expiring = plans.filter((p) => {
+      const remaining =
+        p.remainingOccurrences ?? p.maxOccurrences - p.generatedCount;
+      return remaining <= 1 && remaining >= 0;
+    });
+    if (expiring.length) {
+      items.push({
+        key: 3,
+        title: 'Plans expiring soon',
+        detail: `${expiring.length} plan(s) have 1 run left`,
+        tone: 'info',
+      });
+    }
+    return items.slice(0, 3);
+  }, [invoices, plans]);
 
   return (
     <PageContainer>
@@ -142,13 +248,21 @@ const HomePage: React.FC = () => {
             <Card
               className={styles.card}
               title="Upcoming recurring runs"
-              extra={<Button size="small">View plans</Button>}
+              extra={
+                <Button
+                  size="small"
+                  onClick={() => history.push('/billing/recurring-plans')}
+                >
+                  View plans
+                </Button>
+              }
             >
               <Table
                 className={styles.table}
                 size="small"
                 pagination={false}
                 dataSource={upcomingRuns}
+                loading={loadingPlans}
                 columns={[
                   { title: 'Plan', dataIndex: 'plan' },
                   { title: 'Customer', dataIndex: 'customer' },
@@ -171,13 +285,21 @@ const HomePage: React.FC = () => {
             <Card
               className={styles.card}
               title="Open invoices"
-              extra={<Button size="small">View invoices</Button>}
+              extra={
+                <Button
+                  size="small"
+                  onClick={() => history.push('/billing/invoices')}
+                >
+                  View invoices
+                </Button>
+              }
             >
               <Table
                 className={styles.table}
                 size="small"
                 pagination={false}
                 dataSource={openInvoices}
+                loading={loadingInvoices}
                 columns={[
                   { title: 'Invoice', dataIndex: 'invoice' },
                   { title: 'Customer', dataIndex: 'customer' },
@@ -209,30 +331,36 @@ const HomePage: React.FC = () => {
         <Row gutter={[16, 16]}>
           <Col xs={24}>
             <Card className={styles.card} title="Alerts and exceptions">
-              <List
-                dataSource={alerts}
-                renderItem={(item) => (
-                  <List.Item>
-                    <Space direction="vertical" size={2}>
-                      <Typography.Text strong>{item.title}</Typography.Text>
-                      <Typography.Text type="secondary">
-                        {item.detail}
-                      </Typography.Text>
-                    </Space>
-                    <Tag
-                      color={
-                        item.tone === 'error'
-                          ? 'red'
-                          : item.tone === 'warning'
-                          ? 'orange'
-                          : 'blue'
-                      }
-                    >
-                      {item.tone.toUpperCase()}
-                    </Tag>
-                  </List.Item>
-                )}
-              />
+              {alerts.length ? (
+                <List
+                  dataSource={alerts}
+                  renderItem={(item) => (
+                    <List.Item>
+                      <Space direction="vertical" size={2}>
+                        <Typography.Text strong>{item.title}</Typography.Text>
+                        <Typography.Text type="secondary">
+                          {item.detail}
+                        </Typography.Text>
+                      </Space>
+                      <Tag
+                        color={
+                          item.tone === 'error'
+                            ? 'red'
+                            : item.tone === 'warning'
+                            ? 'orange'
+                            : 'blue'
+                        }
+                      >
+                        {item.tone.toUpperCase()}
+                      </Tag>
+                    </List.Item>
+                  )}
+                />
+              ) : (
+                <Typography.Text type="secondary">
+                  No alerts right now
+                </Typography.Text>
+              )}
             </Card>
           </Col>
         </Row>

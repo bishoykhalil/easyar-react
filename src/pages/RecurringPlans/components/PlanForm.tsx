@@ -34,17 +34,16 @@ const PlanForm: React.FC<Props> = ({
       unit?: string;
     }[]
   >([]);
+  const hasUnlinkedItems = items.some((item) => !item.priceListItemId);
 
   useEffect(() => {
     if (open) {
-      const mapped = (initialValues?.items || [])
-        .filter((it: any) => it.priceListItemId)
-        .map((it: any) => ({
-          priceListItemId: it.priceListItemId,
-          quantity: it.quantity || 1,
-          name: it.name,
-          unit: it.unit,
-        }));
+      const mapped = (initialValues?.items || []).map((it: any) => ({
+        priceListItemId: it.priceListItemId,
+        quantity: it.quantity || 1,
+        name: it.name,
+        unit: it.unit,
+      }));
       setItems(mapped);
       formRef.current?.setFieldsValue({
         tempItemId: undefined,
@@ -56,6 +55,10 @@ const PlanForm: React.FC<Props> = ({
   }, [open, initialValues]);
 
   const handleAddItem = async () => {
+    if (hasUnlinkedItems) {
+      message.warning('Items from invoice are read-only');
+      return;
+    }
     try {
       const values = await formRef.current?.validateFields([
         'tempItemId',
@@ -120,7 +123,7 @@ const PlanForm: React.FC<Props> = ({
           message.error('Add at least one item');
           return false;
         }
-        const payload = { ...values, items };
+        const payload = hasUnlinkedItems ? { ...values } : { ...values, items };
         return onFinish(payload);
       }}
       onValuesChange={(changed) => {
@@ -222,8 +225,9 @@ const PlanForm: React.FC<Props> = ({
         Items
       </Typography.Title>
       <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
-        Select a price list item, set quantity, and click Add. Prices/VAT will
-        follow the selected item.
+        {hasUnlinkedItems
+          ? 'Items were created from an invoice and are read-only here.'
+          : 'Select a price list item, set quantity, and click Add. Prices/VAT will follow the selected item.'}
       </Typography.Paragraph>
 
       <div
@@ -248,6 +252,7 @@ const PlanForm: React.FC<Props> = ({
             rules={[{ required: true, message: 'Select item' }]}
             showSearch
             debounceTime={300}
+            disabled={hasUnlinkedItems}
             request={async ({ keyWords }) => {
               try {
                 const res = await listPriceItemsPaged({
@@ -284,8 +289,13 @@ const PlanForm: React.FC<Props> = ({
             min={1}
             fieldProps={{ step: 1, precision: 0 }}
             rules={[{ required: true, message: 'Enter quantity' }]}
+            disabled={hasUnlinkedItems}
           />
-          <Button type="dashed" onClick={handleAddItem}>
+          <Button
+            type="dashed"
+            onClick={handleAddItem}
+            disabled={hasUnlinkedItems}
+          >
             Add
           </Button>
         </div>
@@ -307,10 +317,12 @@ const PlanForm: React.FC<Props> = ({
               width: 60,
               render: (_: any, __: any, index: number) => (
                 <a
-                  style={{ color: 'red' }}
-                  onClick={() => handleRemoveItem(index)}
+                  style={{ color: hasUnlinkedItems ? '#555' : 'red' }}
+                  onClick={() => {
+                    if (!hasUnlinkedItems) handleRemoveItem(index);
+                  }}
                 >
-                  Remove
+                  {hasUnlinkedItems ? '' : 'Remove'}
                 </a>
               ),
             },

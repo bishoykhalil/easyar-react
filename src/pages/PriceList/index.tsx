@@ -75,6 +75,13 @@ const PriceListPage: React.FC = () => {
       ),
     },
     {
+      title: 'Description',
+      dataIndex: 'description',
+      ellipsis: true,
+      width: 280,
+      hideInSearch: true,
+    },
+    {
       title: 'Unit',
       dataIndex: 'unit',
       width: 120,

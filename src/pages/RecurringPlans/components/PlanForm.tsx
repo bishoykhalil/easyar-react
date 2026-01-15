@@ -1,5 +1,10 @@
 import { listCustomers, type CustomerDTO } from '@/services/customers';
-import { listPriceItemsPaged } from '@/services/pricelist';
+import {
+  listPriceItemsPaged,
+  type PriceListItemDTO,
+} from '@/services/pricelist';
+import { formatCustomerLabel } from '@/utils/customers';
+import { formatPriceItemLabel } from '@/utils/priceList';
 import {
   ModalForm,
   ProFormDatePicker,
@@ -26,6 +31,9 @@ const PlanForm: React.FC<Props> = ({
   onFinish,
 }) => {
   const formRef = useRef<any>();
+  const [priceItemCache, setPriceItemCache] = useState<
+    Record<number, PriceListItemDTO>
+  >({});
   const [items, setItems] = useState<
     {
       priceListItemId?: number;
@@ -62,6 +70,7 @@ const PlanForm: React.FC<Props> = ({
         tempItemDescription: undefined,
         tempItemUnitPriceNet: undefined,
         tempItemVatRate: undefined,
+        tempDiscount: 0,
         tempQty: undefined,
       });
     }
@@ -73,24 +82,38 @@ const PlanForm: React.FC<Props> = ({
       return;
     }
     try {
-      const values = await formRef.current?.validateFields([
-        'tempItemId',
-        'tempQty',
-      ]);
-      const priceListItemId = values?.tempItemId;
-      const qty = values?.tempQty;
-      const name = values?.tempItemName;
-      const unit = values?.tempItemUnit;
-      const description = values?.tempItemDescription;
+      await formRef.current?.validateFields(['tempItemId', 'tempQty']);
+      const rawItemId = formRef.current?.getFieldValue('tempItemId');
+      const priceListItemId = rawItemId ? Number(rawItemId) : undefined;
+      const qtyRaw = formRef.current?.getFieldValue('tempQty');
+      const qty = typeof qtyRaw === 'number' ? qtyRaw : Number(qtyRaw);
+      const cachedItem =
+        priceListItemId && priceItemCache[priceListItemId]
+          ? priceItemCache[priceListItemId]
+          : undefined;
+      const name =
+        formRef.current?.getFieldValue('tempItemName') ?? cachedItem?.name;
+      const unit =
+        formRef.current?.getFieldValue('tempItemUnit') ?? cachedItem?.unit;
+      const description =
+        formRef.current?.getFieldValue('tempItemDescription') ??
+        cachedItem?.description;
+      const unitPriceNetRaw =
+        formRef.current?.getFieldValue('tempItemUnitPriceNet') ??
+        cachedItem?.priceNet;
       const unitPriceNet =
-        values?.tempItemUnitPriceNet !== undefined
-          ? Number(values?.tempItemUnitPriceNet)
-          : undefined;
-      const vatRate =
-        values?.tempItemVatRate !== undefined
-          ? Number(values?.tempItemVatRate)
-          : undefined;
-      if (!priceListItemId || !qty) return;
+        unitPriceNetRaw !== undefined ? Number(unitPriceNetRaw) : undefined;
+      const vatRateRaw =
+        formRef.current?.getFieldValue('tempItemVatRate') ??
+        cachedItem?.vatRate;
+      const vatRate = vatRateRaw !== undefined ? Number(vatRateRaw) : undefined;
+      const discountPercentRaw = formRef.current?.getFieldValue('tempDiscount');
+      const discountPercent = Number(discountPercentRaw ?? 0);
+      if (!priceListItemId || !Number.isFinite(qty) || qty <= 0) return;
+      if (!name) {
+        message.error('Select a valid price list item');
+        return;
+      }
       setItems((prev) => {
         const matchIndex = prev.findIndex(
           (item) => item.priceListItemId === priceListItemId,
@@ -115,7 +138,7 @@ const PlanForm: React.FC<Props> = ({
             unit,
             unitPriceNet,
             vatRate,
-            discountPercent: 0,
+            discountPercent,
           },
         ];
       });
@@ -126,6 +149,7 @@ const PlanForm: React.FC<Props> = ({
         tempItemDescription: undefined,
         tempItemUnitPriceNet: undefined,
         tempItemVatRate: undefined,
+        tempDiscount: 0,
         tempQty: undefined,
       });
     } catch {
@@ -187,7 +211,7 @@ const PlanForm: React.FC<Props> = ({
               });
               return (
                 res.data?.map((c: CustomerDTO) => ({
-                  label: c.name,
+                  label: formatCustomerLabel(c.name, c.city),
                   value: c.id!,
                 })) || []
               );
@@ -282,7 +306,7 @@ const PlanForm: React.FC<Props> = ({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 120px 100px',
+              gridTemplateColumns: '1fr 120px 120px 100px',
               gap: 12,
               alignItems: 'end',
             }}
@@ -290,7 +314,6 @@ const PlanForm: React.FC<Props> = ({
             <ProFormSelect
               name="tempItemId"
               label="Price List Item"
-              rules={[{ required: true, message: 'Select item' }]}
               showSearch
               debounceTime={300}
               disabled={itemsReadOnly}
@@ -298,18 +321,27 @@ const PlanForm: React.FC<Props> = ({
                 try {
                   const res = await listPriceItemsPaged({
                     q: keyWords && keyWords.length > 0 ? keyWords : '%',
+                    onlyActive: true,
                     page: 0,
                     size: 20,
                   });
+                  const content = res.data?.content || [];
+                  if (content.length > 0) {
+                    setPriceItemCache((prev) => {
+                      const next = { ...prev };
+                      content.forEach((item) => {
+                        if (item.id !== undefined) {
+                          next[item.id] = item;
+                        }
+                      });
+                      return next;
+                    });
+                  }
                   return (
-                    res.data?.content?.map((p) => ({
-                      label: p.name || '',
+                    content.map((p) => ({
+                      label: formatPriceItemLabel(p.name, p.description),
                       value: p.id!,
-                      unit: p.unit,
-                      name: p.name || '',
-                      description: p.description || '',
-                      unitPriceNet: p.priceNet,
-                      vatRate: p.vatRate,
+                      item: p,
                     })) || []
                   );
                 } catch {
@@ -318,12 +350,17 @@ const PlanForm: React.FC<Props> = ({
               }}
               fieldProps={{
                 onSelect: (_val, option: any) => {
+                  const selected: PriceListItemDTO | undefined =
+                    option?.item ??
+                    (typeof _val === 'number'
+                      ? priceItemCache[_val]
+                      : undefined);
                   formRef.current?.setFieldsValue({
-                    tempItemName: option?.name,
-                    tempItemUnit: option?.unit,
-                    tempItemDescription: option?.description,
-                    tempItemUnitPriceNet: option?.unitPriceNet,
-                    tempItemVatRate: option?.vatRate,
+                    tempItemName: selected?.name ?? option?.label,
+                    tempItemUnit: selected?.unit,
+                    tempItemDescription: selected?.description,
+                    tempItemUnitPriceNet: selected?.priceNet,
+                    tempItemVatRate: selected?.vatRate,
                   });
                 },
               }}
@@ -338,7 +375,14 @@ const PlanForm: React.FC<Props> = ({
               label="Quantity"
               min={1}
               fieldProps={{ step: 1, precision: 0 }}
-              rules={[{ required: true, message: 'Enter quantity' }]}
+              disabled={itemsReadOnly}
+            />
+            <ProFormDigit
+              name="tempDiscount"
+              label="Discount %"
+              min={0}
+              max={100}
+              fieldProps={{ step: 1, precision: 0 }}
               disabled={itemsReadOnly}
             />
             <Button

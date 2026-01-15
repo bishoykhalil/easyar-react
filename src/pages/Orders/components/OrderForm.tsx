@@ -1,4 +1,5 @@
 import { listCustomers, type CustomerDTO } from '@/services/customers';
+import { formatCustomerLabel } from '@/utils/customers';
 import {
   ModalForm,
   ProFormSelect,
@@ -45,7 +46,7 @@ const OrderForm: React.FC<Props> = ({
             });
             return (
               res.data?.map((c: CustomerDTO) => ({
-                label: c.name,
+                label: formatCustomerLabel(c.name, c.city),
                 value: c.id!,
               })) || []
             );

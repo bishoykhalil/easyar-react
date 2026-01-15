@@ -6,6 +6,7 @@ import {
   type CustomerDTO,
 } from '@/services/customers';
 import { createOrder } from '@/services/orders';
+import { formatCustomerLabel } from '@/utils/customers';
 import {
   PageContainer,
   ProFormSelect,
@@ -48,14 +49,16 @@ const CustomersPage: React.FC = () => {
               const res = await listCustomers({
                 search: keyWords && keyWords.trim().length > 0 ? keyWords : '%',
               });
-              const names = Array.from(
-                new Set(
-                  (res.data || [])
-                    .map((c) => c.name)
-                    .filter((n): n is string => !!n),
-                ),
-              );
-              return names.map((n) => ({ label: n, value: n }));
+              const map = new Map<string, string>();
+              (res.data || []).forEach((c) => {
+                if (c.name && !map.has(c.name)) {
+                  map.set(c.name, formatCustomerLabel(c.name, c.city));
+                }
+              });
+              return Array.from(map.entries()).map(([value, label]) => ({
+                label,
+                value,
+              }));
             }}
           />
         );

@@ -1,4 +1,5 @@
 import { listPriceItemsPaged } from '@/services/pricelist';
+import { formatPriceItemLabel } from '@/utils/priceList';
 import {
   ModalForm,
   ProFormDigit,
@@ -37,12 +38,13 @@ const OrderItemForm: React.FC<Props> = ({ open, onOpenChange, onFinish }) => {
           try {
             const res = await listPriceItemsPaged({
               q: keyWords && keyWords.length > 0 ? keyWords : '%',
+              onlyActive: true,
               page: 0,
               size: 10,
             });
             return (
               res.data?.content?.map((p) => ({
-                label: p.name || '',
+                label: formatPriceItemLabel(p.name, p.description),
                 value: p.id!,
                 data: p,
               })) || []

@@ -59,6 +59,40 @@ export default defineConfig({
       ],
     },
     {
+      name: 'Dashboards',
+      path: '/dashboards',
+      routes: [
+        {
+          path: '/dashboards',
+          redirect: '/dashboards/finance',
+        },
+        {
+          name: 'Finance Overview',
+          path: '/dashboards/finance',
+          component: './Dashboards/Finance',
+          access: 'canSeeAdmin',
+        },
+        {
+          name: 'Recurring Ops',
+          path: '/dashboards/recurring',
+          component: './Dashboards/Recurring',
+          access: 'canSeeAdmin',
+        },
+        {
+          name: 'Customer Health',
+          path: '/dashboards/customers',
+          component: './Dashboards/Customers',
+          access: 'canSeeAdmin',
+        },
+        {
+          name: 'Worklist',
+          path: '/dashboards/worklist',
+          component: './Dashboards/Worklist',
+          access: 'canSeeAdmin',
+        },
+      ],
+    },
+    {
       name: 'Management',
       path: '/management',
       routes: [

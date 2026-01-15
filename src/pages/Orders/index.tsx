@@ -12,6 +12,8 @@ import {
   type OrderStatus,
 } from '@/services/orders';
 import { listPriceItemsPaged } from '@/services/pricelist';
+import { formatCustomerLabel } from '@/utils/customers';
+import { formatPriceItemLabel } from '@/utils/priceList';
 import {
   PageContainer,
   ProTable,
@@ -96,12 +98,13 @@ const OrdersPage: React.FC = () => {
     try {
       const res = await listPriceItemsPaged({
         q: q && q.trim().length > 0 ? q : '%',
+        onlyActive: true,
         page: 0,
         size: 10,
       });
       setPriceOptions(
         res.data?.content?.map((p) => ({
-          label: p.name || '',
+          label: formatPriceItemLabel(p.name, p.description),
           value: p.id!,
           data: p,
         })) || [],
@@ -171,13 +174,18 @@ const OrdersPage: React.FC = () => {
                 const res = await listCustomers({
                   search: v && v.trim().length > 0 ? v : '%',
                 });
-                const opts =
-                  res.data
-                    ?.map((c) => ({ label: c.name, value: c.name }))
-                    .filter(
-                      (o, idx, arr) =>
-                        arr.findIndex((x) => x.value === o.value) === idx,
-                    ) || [];
+                const map = new Map<string, string>();
+                (res.data || []).forEach((c) => {
+                  if (c.name && !map.has(c.name)) {
+                    map.set(c.name, formatCustomerLabel(c.name, c.city));
+                  }
+                });
+                const opts = Array.from(map.entries()).map(
+                  ([value, label]) => ({
+                    label,
+                    value,
+                  }),
+                );
                 setCustomerOptions(opts);
               } catch {
                 // ignore

@@ -108,14 +108,20 @@ const SettingsPage: React.FC = () => {
               <ProFormTextArea
                 name="companyAddress"
                 label="Company Address"
-                colProps={{ span: 12 }}
-                fieldProps={{ rows: 3 }}
+                colProps={{ span: 8 }}
+                fieldProps={{ rows: 4 }}
               />
               <ProFormTextArea
                 name="contactInfo"
                 label="Contact Info"
-                colProps={{ span: 12 }}
-                fieldProps={{ rows: 3 }}
+                colProps={{ span: 8 }}
+                fieldProps={{ rows: 4 }}
+              />
+              <ProFormTextArea
+                name="bankDetails"
+                label="Bank Details"
+                colProps={{ span: 8 }}
+                fieldProps={{ rows: 4 }}
               />
             </ProFormGroup>
           </ProCard>
@@ -176,21 +182,17 @@ const SettingsPage: React.FC = () => {
             </ProFormGroup>
           </ProCard>
 
-          <ProCard title="Communications" bordered>
-            <ProFormGroup>
+          <ProCard title="Communications" bordered bodyStyle={{ padding: 16 }}>
+            <ProCard title="Communications">
               <ProFormTextArea
                 name="footerText"
                 label="Footer Text"
-                colProps={{ span: 12 }}
-                fieldProps={{ rows: 3 }}
+                tooltip="Shown at the bottom of invoice PDFs"
+                fieldProps={{
+                  autoSize: { minRows: 6 },
+                }}
               />
-              <ProFormTextArea
-                name="bankDetails"
-                label="Bank Details"
-                colProps={{ span: 12 }}
-                fieldProps={{ rows: 3 }}
-              />
-            </ProFormGroup>
+            </ProCard>
           </ProCard>
 
           <ProCard title="Theme" bordered bodyStyle={{ padding: 16 }}>

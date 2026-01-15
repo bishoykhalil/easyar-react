@@ -131,7 +131,7 @@ const PriceListPage: React.FC = () => {
           >
             Edit
           </a>
-          {record.active && (
+          {record.active ? (
             <Popconfirm
               title="Disable this item?"
               onConfirm={async () => {
@@ -145,6 +145,28 @@ const PriceListPage: React.FC = () => {
               }}
             >
               <a style={{ color: 'red' }}>Disable</a>
+            </Popconfirm>
+          ) : (
+            <Popconfirm
+              title="Enable this item?"
+              onConfirm={async () => {
+                try {
+                  await updatePriceItem(record.id!, {
+                    name: record.name,
+                    description: record.description,
+                    unit: record.unit,
+                    priceNet: record.priceNet,
+                    vatRate: record.vatRate,
+                    active: true,
+                  });
+                  message.success('Enabled');
+                  actionRef.current?.reload();
+                } catch (err: any) {
+                  message.error(err?.data?.message || 'Enable failed');
+                }
+              }}
+            >
+              <a style={{ color: '#22c55e' }}>Enable</a>
             </Popconfirm>
           )}
         </Space>

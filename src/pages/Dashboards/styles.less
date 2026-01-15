@@ -1,0 +1,54 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  background: #1f1f1f;
+  border-color: #303030;
+}
+
+.card :global(.ant-card-head) {
+  border-bottom: 1px solid #303030;
+}
+
+.kpiLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9ca3af;
+}
+
+.kpiValue {
+  margin: 0;
+}
+
+.muted {
+  color: #9ca3af;
+}
+
+.table :global(.ant-table) {
+  background: transparent;
+}
+
+.table :global(.ant-table-thead > tr > th) {
+  background: #1b1b1b;
+  border-bottom: 1px solid #303030;
+  color: #e5e7eb;
+}
+
+.table :global(.ant-table-tbody > tr > td) {
+  background: transparent;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #111827;
+  border: 1px solid #303030;
+}

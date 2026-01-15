@@ -16,6 +16,7 @@ import {
   type PriceListItemDTO,
 } from '@/services/pricelist';
 import { createPlanFromInvoice } from '@/services/recurring';
+import { formatPriceItemLabel } from '@/utils/priceList';
 import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
@@ -26,7 +27,9 @@ import {
   PageContainer,
   ProTable,
   type ProColumns,
+  type ProFormInstance,
 } from '@ant-design/pro-components';
+import { useLocation } from '@umijs/max';
 import {
   Badge,
   Button,
@@ -108,6 +111,8 @@ const InvoicesPage: React.FC = () => {
     null,
   );
   const [customerLoading, setCustomerLoading] = useState(false);
+  const formRef = useRef<ProFormInstance>();
+  const location = useLocation();
 
   const openPlanModal = async (record: InvoiceResponseDTO) => {
     try {
@@ -550,6 +555,27 @@ const InvoicesPage: React.FC = () => {
   );
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const statusParam = params.get('status')?.toUpperCase();
+    const validStatuses: InvoiceStatus[] = [
+      'ISSUED',
+      'SENT',
+      'PAID',
+      'RETURNED',
+      'OVERDUE',
+    ];
+    const status = validStatuses.includes(statusParam as InvoiceStatus)
+      ? (statusParam as InvoiceStatus)
+      : undefined;
+    formRef.current?.setFieldsValue({
+      status,
+    });
+    if (status) {
+      formRef.current?.submit?.();
+    }
+  }, [location.search]);
+
+  useEffect(() => {
     const loadCustomer = async () => {
       if (!selected?.customerId) {
         setCustomerDetails(null);
@@ -669,6 +695,7 @@ const InvoicesPage: React.FC = () => {
       <ProTable<InvoiceResponseDTO>
         rowKey="id"
         actionRef={actionRef}
+        formRef={formRef}
         columns={columns}
         search={{
           labelWidth: 90,
@@ -1090,7 +1117,7 @@ const InvoicesPage: React.FC = () => {
               }}
               onChange={(val) => setAddPriceId(val)}
               options={priceOptions.map((opt) => ({
-                label: `${opt.name} ${opt.unit ? `(${opt.unit})` : ''}`,
+                label: formatPriceItemLabel(opt.name, opt.description),
                 value: opt.id as number,
               }))}
             />

@@ -38,3 +38,200 @@
   background: transparent;
   border-bottom: 1px solid #2a2a2a;
 }
+
+.chartWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+}
+
+.chartContainer {
+  position: relative;
+  flex: 1;
+}
+
+.chart {
+  width: 100%;
+  min-height: 72px;
+  height: 100%;
+  flex: 1;
+}
+
+.chartGrid {
+  stroke: #2a2a2a;
+  stroke-width: 0.5;
+}
+
+.chartDotNet {
+  fill: #2563eb;
+}
+
+.chartDotGross {
+  fill: #22c55e;
+}
+
+.chartTooltip {
+  position: absolute;
+  top: 8px;
+  transform: translateX(-50%);
+  background: #111827;
+  border: 1px solid #303030;
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 140px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 30%);
+  pointer-events: none;
+}
+
+.tooltipTitle {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tooltipRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.tooltipDotNet,
+.tooltipDotGross {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.tooltipDotNet {
+  background: #2563eb;
+}
+
+.tooltipDotGross {
+  background: #22c55e;
+}
+
+.chartText {
+  fill: #9ca3af;
+  font-size: 3px;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.legendDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.funnelSummary {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.funnel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.funnelItem {
+  appearance: none;
+  border: 1px solid #303030;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: #1b1b1b;
+  border-radius: 8px;
+}
+
+.topRow {
+  align-items: stretch;
+}
+
+.topRow :global(.ant-col) {
+  display: flex;
+}
+
+.stretchCard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.stretchCard :global(.ant-card-body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.funnelItem:hover {
+  border-color: #3f3f3f;
+  background: #222;
+}
+
+.funnelLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.funnelDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.funnelIssued {
+  background: #f59e0b;
+}
+
+.funnelSent {
+  background: #3b82f6;
+}
+
+.funnelPaid {
+  background: #22c55e;
+}
+
+.funnelReturned {
+  background: #f97316;
+}
+
+.funnelOverdue {
+  background: #ef4444;
+}
+
+.funnelCount {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.funnelBar {
+  height: 6px;
+  background: #111827;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.funnelBar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #22c55e);
+}

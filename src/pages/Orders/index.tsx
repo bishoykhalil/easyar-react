@@ -8,6 +8,7 @@ import {
   listOrdersPaged,
   removeItem,
   updateItem,
+  type OrderItemDTO,
   type OrderResponseDTO,
   type OrderStatus,
 } from '@/services/orders';
@@ -20,7 +21,7 @@ import {
   type ProColumns,
   type ProFormInstance,
 } from '@ant-design/pro-components';
-import { history, useLocation } from '@umijs/max';
+import { history, useIntl, useLocation } from '@umijs/max';
 import {
   Badge,
   Button,
@@ -50,6 +51,7 @@ const statusColors: Record<
 
 const OrdersPage: React.FC = () => {
   const actionRef = useRef<any>();
+  const intl = useIntl();
   const [formOpen, setFormOpen] = useState(false);
   const [initialOrderValues, setInitialOrderValues] = useState<any>(undefined);
   const [selectedOrder, setSelectedOrder] = useState<
@@ -75,6 +77,10 @@ const OrdersPage: React.FC = () => {
     { label: string; value: number; data: any }[]
   >([]);
   const [adding, setAdding] = useState(false);
+  const [itemEdits, setItemEdits] = useState<
+    Record<number, { quantity?: number; discountPercent?: number }>
+  >({});
+  const [savingItemId, setSavingItemId] = useState<number | null>(null);
   const [customerOptions, setCustomerOptions] = useState<
     { label: string; value: string }[]
   >([]);
@@ -82,6 +88,10 @@ const OrdersPage: React.FC = () => {
     style: 'currency',
     currency: 'EUR',
   });
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
+  const statusLabel = (status: string) =>
+    t(`status.${status.toLowerCase()}`, status);
 
   const openInvoicePdf = async (id: number) => {
     try {
@@ -90,7 +100,10 @@ const OrdersPage: React.FC = () => {
       window.open(url);
       setTimeout(() => window.URL.revokeObjectURL(url), 60000);
     } catch (err: any) {
-      message.error(err?.data?.message || 'Failed to open invoice PDF');
+      message.error(
+        err?.data?.message ||
+          t('message.failedToOpenPdf', 'Failed to open invoice PDF'),
+      );
     }
   };
 
@@ -140,7 +153,7 @@ const OrdersPage: React.FC = () => {
 
   const columns: ProColumns<OrderResponseDTO>[] = [
     {
-      title: 'Order #',
+      title: t('table.orderNumber', 'Order #'),
       dataIndex: 'orderNumber',
       render: (_, record) => (
         <a
@@ -150,7 +163,10 @@ const OrdersPage: React.FC = () => {
               setSelectedOrder(res.data);
               setDrawerOpen(true);
             } catch (err: any) {
-              message.error(err?.data?.message || 'Failed to load order');
+              message.error(
+                err?.data?.message ||
+                  t('message.failedToLoadOrder', 'Failed to load order'),
+              );
             }
           }}
         >
@@ -159,7 +175,7 @@ const OrdersPage: React.FC = () => {
       ),
     },
     {
-      title: 'Customer',
+      title: t('table.customer', 'Customer'),
       dataIndex: 'customerName',
       renderFormItem: (_, { type }, form) => {
         if (type === 'form') return null;
@@ -167,7 +183,7 @@ const OrdersPage: React.FC = () => {
           <Select
             showSearch
             allowClear
-            placeholder="Select customer"
+            placeholder={t('placeholder.selectCustomer', 'Select customer')}
             filterOption={false}
             onSearch={async (v) => {
               try {
@@ -211,7 +227,10 @@ const OrdersPage: React.FC = () => {
               setCustomerDetails(match || null);
               setCustomerDrawerOpen(true);
             } catch (err: any) {
-              message.error(err?.data?.message || 'Failed to load customer');
+              message.error(
+                err?.data?.message ||
+                  t('message.failedToLoadCustomer', 'Failed to load customer'),
+              );
             }
           }}
         >
@@ -220,7 +239,13 @@ const OrdersPage: React.FC = () => {
       ),
     },
     {
-      title: 'Status',
+      title: t('table.createdBy', 'Created by'),
+      dataIndex: 'createdByName',
+      hideInSearch: true,
+      renderText: (val) => val || '-',
+    },
+    {
+      title: t('table.status', 'Status'),
       dataIndex: 'status',
       render: (_, record) => (
         <Tag
@@ -236,29 +261,29 @@ const OrdersPage: React.FC = () => {
               : 'red'
           }
         >
-          {record.status}
+          {statusLabel(record.status)}
         </Tag>
       ),
       valueType: 'select',
       valueEnum: {
-        DRAFT: { text: 'DRAFT' },
-        INVOICED: { text: 'INVOICED' },
+        DRAFT: { text: statusLabel('DRAFT') },
+        INVOICED: { text: statusLabel('INVOICED') },
       },
     },
     {
-      title: 'Net',
+      title: t('table.net', 'Net'),
       dataIndex: 'totalNet',
       renderText: (val) => (val !== undefined ? money.format(val) : ''),
       align: 'right',
     },
     {
-      title: 'Gross',
+      title: t('table.gross', 'Gross'),
       dataIndex: 'totalGross',
       renderText: (val) => (val !== undefined ? money.format(val) : ''),
       align: 'right',
     },
     {
-      title: 'Created At',
+      title: t('table.createdAt', 'Created At'),
       dataIndex: 'createdAt',
       valueType: 'dateTime',
       sorter: true,
@@ -266,7 +291,7 @@ const OrdersPage: React.FC = () => {
       hideInSearch: true,
     },
     {
-      title: 'Actions',
+      title: t('table.actions', 'Actions'),
       valueType: 'option',
       render: (_, record) => {
         const canCreateInvoice =
@@ -280,11 +305,14 @@ const OrdersPage: React.FC = () => {
                   setSelectedOrder(res.data);
                   setDrawerOpen(true);
                 } catch (err: any) {
-                  message.error(err?.data?.message || 'Failed to load order');
+                  message.error(
+                    err?.data?.message ||
+                      t('message.failedToLoadOrder', 'Failed to load order'),
+                  );
                 }
               }}
             >
-              View
+              {t('action.view', 'View')}
             </a>
             {record.invoiceId ? (
               <a
@@ -294,7 +322,9 @@ const OrdersPage: React.FC = () => {
                   }
                 }}
               >
-                {record.invoiceNumber ? record.invoiceNumber : 'View Invoice'}
+                {record.invoiceNumber
+                  ? record.invoiceNumber
+                  : t('action.viewInvoice', 'View Invoice')}
               </a>
             ) : (
               <a
@@ -302,14 +332,19 @@ const OrdersPage: React.FC = () => {
                   if (!canCreateInvoice) return;
                   try {
                     await createFromOrder(record.id);
-                    message.success('Invoice created');
+                    message.success(
+                      t('message.invoiceCreated', 'Invoice created'),
+                    );
                     actionRef.current?.reload();
                   } catch (err: any) {
                     const msg =
                       err?.data?.message ||
                       err?.response?.data?.message ||
                       err?.message ||
-                      'Invoice creation failed';
+                      t(
+                        'message.invoiceCreateFailed',
+                        'Invoice creation failed',
+                      );
                     message.error(msg);
                   }
                 }}
@@ -318,23 +353,26 @@ const OrdersPage: React.FC = () => {
                   pointerEvents: canCreateInvoice ? 'auto' : 'none',
                 }}
               >
-                Create Invoice
+                {t('action.createInvoice', 'Create Invoice')}
               </a>
             )}
             {record.status === 'DRAFT' && (
               <Popconfirm
-                title="Delete this order?"
+                title={t('message.orderDeleteConfirm', 'Delete this order?')}
                 onConfirm={async () => {
                   try {
                     await deleteOrder(record.id);
-                    message.success('Deleted');
+                    message.success(t('message.deleted', 'Deleted'));
                     actionRef.current?.reload();
                   } catch (err: any) {
-                    message.error(err?.data?.message || 'Delete failed');
+                    message.error(
+                      err?.data?.message ||
+                        t('message.deleteFailed', 'Delete failed'),
+                    );
                   }
                 }}
               >
-                <a style={{ color: 'red' }}>Delete</a>
+                <a style={{ color: 'red' }}>{t('action.delete', 'Delete')}</a>
               </Popconfirm>
             )}
           </Space>
@@ -364,7 +402,7 @@ const OrdersPage: React.FC = () => {
         const res = await updateItem(selectedOrder.id, existingItem.id, {
           quantity: (existingItem.quantity || 0) + qtyToAdd,
         });
-        message.success('Quantity updated');
+        message.success(t('message.quantityUpdated', 'Quantity updated'));
         setSelectedOrder(res.data);
         actionRef.current?.reload();
         itemForm.resetFields();
@@ -379,7 +417,7 @@ const OrdersPage: React.FC = () => {
         payload.vatRate = opt.data.vatRate;
       }
       const res = await addItem(selectedOrder.id, payload);
-      message.success('Item added');
+      message.success(t('message.itemAdded', 'Item added'));
       setSelectedOrder(res.data);
       actionRef.current?.reload();
       itemForm.resetFields();
@@ -389,7 +427,7 @@ const OrdersPage: React.FC = () => {
         err?.data?.message ||
         err?.response?.data?.message ||
         err?.message ||
-        'Add item failed';
+        t('message.addItemFailed', 'Add item failed');
       message.error(msg);
       return false;
     } finally {
@@ -399,6 +437,37 @@ const OrdersPage: React.FC = () => {
 
   const canCreateInvoice =
     selectedOrder?.status === 'DRAFT' && (selectedOrder.items?.length ?? 0) > 0;
+
+  const commitOrderItemPatch = async (
+    itemId: number,
+    patch: Partial<OrderItemDTO>,
+  ) => {
+    if (!selectedOrder?.id) return;
+    try {
+      setSavingItemId(itemId);
+      const res = await updateItem(selectedOrder.id, itemId, patch);
+      setSelectedOrder(res.data);
+      actionRef.current?.reload();
+      setItemEdits((prev) => {
+        const next = { ...prev };
+        const entry = next[itemId];
+        if (!entry) return prev;
+        const cleaned = { ...entry };
+        if ('quantity' in patch) delete cleaned.quantity;
+        if ('discountPercent' in patch) delete cleaned.discountPercent;
+        if (Object.keys(cleaned).length === 0) delete next[itemId];
+        else next[itemId] = cleaned;
+        return next;
+      });
+      message.success(t('message.updated', 'Updated'));
+    } catch (err: any) {
+      message.error(
+        err?.data?.message || t('message.updateFailed', 'Update failed'),
+      );
+    } finally {
+      setSavingItemId(null);
+    }
+  };
 
   return (
     <PageContainer>
@@ -413,19 +482,21 @@ const OrdersPage: React.FC = () => {
       >
         <Space size={24} wrap>
           <Typography.Text>
-            Draft: {tableData.filter((o) => o.status === 'DRAFT').length}
+            {t('summary.draft', 'Draft')}:{' '}
+            {tableData.filter((o) => o.status === 'DRAFT').length}
           </Typography.Text>
           <Typography.Text>
-            Invoiced: {tableData.filter((o) => o.status === 'INVOICED').length}
+            {t('summary.invoiced', 'Invoiced')}:{' '}
+            {tableData.filter((o) => o.status === 'INVOICED').length}
           </Typography.Text>
           <Typography.Text strong>
-            Net total:{' '}
+            {t('summary.netTotal', 'Net total')}:{' '}
             {money.format(
               tableData.reduce((sum, o) => sum + (o.totalNet || 0), 0),
             )}
           </Typography.Text>
           <Typography.Text strong>
-            Gross total:{' '}
+            {t('summary.grossTotal', 'Gross total')}:{' '}
             {money.format(
               tableData.reduce((sum, o) => sum + (o.totalGross || 0), 0),
             )}
@@ -442,7 +513,12 @@ const OrdersPage: React.FC = () => {
           labelWidth: 90,
           span: 6,
         }}
-        locale={{ emptyText: 'No orders yet. Create your first order.' }}
+        locale={{
+          emptyText: t(
+            'empty.orders',
+            'No orders yet. Create your first order.',
+          ),
+        }}
         request={async (params) => {
           setTableLoading(true);
           try {
@@ -494,7 +570,10 @@ const OrdersPage: React.FC = () => {
               total: data.length,
             };
           } catch (err: any) {
-            message.error(err?.data?.message || 'Failed to load orders');
+            message.error(
+              err?.data?.message ||
+                t('message.failedToLoadOrders', 'Failed to load orders'),
+            );
             return { data: [], success: false };
           } finally {
             setTableLoading(false);
@@ -509,9 +588,9 @@ const OrdersPage: React.FC = () => {
           };
         }}
         toolbar={{
-          title: 'Orders',
+          title: t('page.orders', 'Orders'),
           subTitle: filterCustomerName
-            ? `Filtered by: ${filterCustomerName}`
+            ? `${t('label.filteredBy', 'Filtered by')}: ${filterCustomerName}`
             : undefined,
           actions: [
             filterCustomerId ? (
@@ -524,12 +603,16 @@ const OrdersPage: React.FC = () => {
                   actionRef.current?.reload();
                 }}
               >
-                Clear Customer Filter
+                {t('action.clearCustomerFilter', 'Clear Customer Filter')}
               </Button>
             ) : null,
             <Segmented
               key="quick-status"
-              options={['ALL', 'DRAFT', 'INVOICED']}
+              options={[
+                { label: t('filter.all', 'All'), value: 'ALL' },
+                { label: statusLabel('DRAFT'), value: 'DRAFT' },
+                { label: statusLabel('INVOICED'), value: 'INVOICED' },
+              ]}
               value={statusQuickFilter}
               onChange={(s) => {
                 const val = s as string;
@@ -555,7 +638,7 @@ const OrdersPage: React.FC = () => {
                 setFormOpen(true);
               }}
             >
-              New Order
+              {t('action.newOrder', 'New Order')}
             </Button>,
           ],
         }}
@@ -568,14 +651,16 @@ const OrdersPage: React.FC = () => {
         onFinish={async (values) => {
           try {
             await createOrder(values);
-            message.success('Order created');
+            message.success(t('message.orderCreated', 'Order created'));
             setFormOpen(false);
             actionRef.current?.reload();
             setInitialOrderValues(undefined);
             history.replace('/billing/orders');
             return true;
           } catch (err: any) {
-            message.error(err?.data?.message || 'Create failed');
+            message.error(
+              err?.data?.message || t('message.createFailed', 'Create failed'),
+            );
             return false;
           }
         }}
@@ -587,8 +672,12 @@ const OrdersPage: React.FC = () => {
         onClose={() => {
           setDrawerOpen(false);
           setSelectedOrder(undefined);
+          setItemEdits({});
+          setSavingItemId(null);
         }}
-        title={`Order ${selectedOrder?.orderNumber || selectedOrder?.id || ''}`}
+        title={`${t('label.order', 'Order')} ${
+          selectedOrder?.orderNumber || selectedOrder?.id || ''
+        }`}
         styles={{
           body: {
             paddingTop: 0,
@@ -598,21 +687,23 @@ const OrdersPage: React.FC = () => {
         {selectedOrder && (
           <>
             <Descriptions column={2} size="small" bordered>
-              <Descriptions.Item label="Customer">
+              <Descriptions.Item label={t('label.customer', 'Customer')}>
                 {selectedOrder.customerName}
               </Descriptions.Item>
-              <Descriptions.Item label="Status">
+              <Descriptions.Item label={t('label.status', 'Status')}>
                 <Badge
                   status={statusColors[selectedOrder.status]}
-                  text={selectedOrder.status}
+                  text={statusLabel(selectedOrder.status)}
                 />
               </Descriptions.Item>
-              <Descriptions.Item label="Invoice">
+              <Descriptions.Item label={t('label.invoice', 'Invoice')}>
                 {selectedOrder.invoiceId ? (
                   <Space size={8}>
                     <a onClick={() => openInvoicePdf(selectedOrder.invoiceId!)}>
                       {selectedOrder.invoiceNumber ||
-                        `Invoice #${selectedOrder.invoiceId}`}
+                        `${t('label.invoiceNumber', 'Invoice #')}${
+                          selectedOrder.invoiceId
+                        }`}
                     </a>
                   </Space>
                 ) : (
@@ -623,7 +714,9 @@ const OrdersPage: React.FC = () => {
                     onClick={async () => {
                       try {
                         await createFromOrder(selectedOrder.id);
-                        message.success('Invoice created');
+                        message.success(
+                          t('message.invoiceCreated', 'Invoice created'),
+                        );
                         // refresh order to get invoice linkage
                         const refreshed = await getOrder(selectedOrder.id);
                         setSelectedOrder(refreshed.data);
@@ -633,32 +726,43 @@ const OrdersPage: React.FC = () => {
                           err?.data?.message ||
                           err?.response?.data?.message ||
                           err?.message ||
-                          'Invoice creation failed';
+                          t(
+                            'message.invoiceCreateFailed',
+                            'Invoice creation failed',
+                          );
                         message.error(msg);
                       }
                     }}
                   >
                     {selectedOrder.status !== 'DRAFT'
-                      ? 'Order already invoiced'
+                      ? t('order.alreadyInvoiced', 'Order already invoiced')
                       : canCreateInvoice
-                      ? 'Create Invoice'
-                      : 'Add items to invoice'}
+                      ? t('action.createInvoice', 'Create Invoice')
+                      : t('order.addItemsToInvoice', 'Add items to invoice')}
                   </Button>
                 )}
               </Descriptions.Item>
-              <Descriptions.Item label="Currency">
+              <Descriptions.Item label={t('label.currency', 'Currency')}>
                 {selectedOrder.currency}
               </Descriptions.Item>
-              <Descriptions.Item label="Default VAT">
+              <Descriptions.Item label={t('label.createdBy', 'Created by')}>
+                {selectedOrder.createdByName || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item
+                label={t('label.createdByUserId', 'Created by User ID')}
+              >
+                {selectedOrder.createdByUserId ?? '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('label.defaultVat', 'Default VAT')}>
                 {selectedOrder.defaultVatRate}
               </Descriptions.Item>
-              <Descriptions.Item label="Total Net">
+              <Descriptions.Item label={t('label.totalNet', 'Total Net')}>
                 {selectedOrder.totalNet}
               </Descriptions.Item>
-              <Descriptions.Item label="Total Gross">
+              <Descriptions.Item label={t('label.totalGross', 'Total Gross')}>
                 {selectedOrder.totalGross}
               </Descriptions.Item>
-              <Descriptions.Item label="Notes" span={2}>
+              <Descriptions.Item label={t('label.notes', 'Notes')} span={2}>
                 {selectedOrder.notes}
               </Descriptions.Item>
             </Descriptions>
@@ -688,23 +792,36 @@ const OrdersPage: React.FC = () => {
                 >
                   <Form.Item
                     name="priceListItemId"
-                    label="Price List Item"
-                    rules={[{ required: true, message: 'Select item' }]}
+                    label={t('label.priceListItem', 'Price List Item')}
+                    rules={[
+                      {
+                        required: true,
+                        message: t('message.selectItemRequired', 'Select item'),
+                      },
+                    ]}
                     style={{ margin: 0, width: 280 }}
                   >
                     <Select
                       showSearch
                       allowClear
                       filterOption={false}
-                      placeholder="Select service"
+                      placeholder={t(
+                        'placeholder.selectService',
+                        'Select service',
+                      )}
                       options={priceOptions}
                       onSearch={(v) => fetchPriceOptions(v)}
                     />
                   </Form.Item>
                   <Form.Item
                     name="quantity"
-                    label="Quantity"
-                    rules={[{ required: true, message: 'Qty required' }]}
+                    label={t('label.quantity', 'Quantity')}
+                    rules={[
+                      {
+                        required: true,
+                        message: t('message.quantityRequired', 'Qty required'),
+                      },
+                    ]}
                     style={{ margin: 0, width: 150 }}
                   >
                     <InputNumber
@@ -716,7 +833,7 @@ const OrdersPage: React.FC = () => {
                   </Form.Item>
                   <Form.Item
                     name="discountPercent"
-                    label="Discount %"
+                    label={t('label.discount', 'Discount %')}
                     style={{ margin: 0, width: 150 }}
                   >
                     <InputNumber
@@ -728,7 +845,7 @@ const OrdersPage: React.FC = () => {
                   </Form.Item>
                   <Form.Item style={{ margin: 0 }}>
                     <Button type="primary" htmlType="submit" loading={adding}>
-                      Add
+                      {t('action.add', 'Add')}
                     </Button>
                   </Form.Item>
                 </Form>
@@ -745,7 +862,7 @@ const OrdersPage: React.FC = () => {
                       background: '#1f1f1f',
                     }}
                   >
-                    Name
+                    {t('table.name', 'Name')}
                   </th>
                   <th
                     style={{
@@ -755,7 +872,7 @@ const OrdersPage: React.FC = () => {
                       background: '#1f1f1f',
                     }}
                   >
-                    Unit
+                    {t('table.unit', 'Unit')}
                   </th>
                   <th
                     style={{
@@ -765,7 +882,7 @@ const OrdersPage: React.FC = () => {
                       background: '#1f1f1f',
                     }}
                   >
-                    Qty
+                    {t('table.quantity', 'Qty')}
                   </th>
                   <th
                     style={{
@@ -775,7 +892,7 @@ const OrdersPage: React.FC = () => {
                       background: '#1f1f1f',
                     }}
                   >
-                    Discount %
+                    {t('table.discount', 'Discount %')}
                   </th>
                   <th
                     style={{
@@ -785,7 +902,7 @@ const OrdersPage: React.FC = () => {
                       background: '#1f1f1f',
                     }}
                   >
-                    Unit Net
+                    {t('table.unitNet', 'Unit Net')}
                   </th>
                   <th
                     style={{
@@ -795,7 +912,7 @@ const OrdersPage: React.FC = () => {
                       background: '#1f1f1f',
                     }}
                   >
-                    Net
+                    {t('table.net', 'Net')}
                   </th>
                   <th
                     style={{
@@ -805,7 +922,7 @@ const OrdersPage: React.FC = () => {
                       background: '#1f1f1f',
                     }}
                   >
-                    Gross
+                    {t('table.gross', 'Gross')}
                   </th>
                   {selectedOrder.status === 'DRAFT' && (
                     <th style={{ width: 90 }}></th>
@@ -844,7 +961,42 @@ const OrdersPage: React.FC = () => {
                         textAlign: 'right',
                       }}
                     >
-                      {item.quantity}
+                      {selectedOrder.status === 'DRAFT' && item.id ? (
+                        <InputNumber
+                          size="small"
+                          min={0}
+                          step={1}
+                          precision={0}
+                          style={{ width: 90 }}
+                          value={
+                            itemEdits[item.id]?.quantity ?? item.quantity ?? 0
+                          }
+                          disabled={savingItemId === item.id}
+                          onChange={(val) => {
+                            setItemEdits((prev) => ({
+                              ...prev,
+                              [item.id!]: {
+                                ...prev[item.id!],
+                                quantity: typeof val === 'number' ? val : 0,
+                              },
+                            }));
+                          }}
+                          onBlur={() => {
+                            const nextQty = itemEdits[item.id!]?.quantity;
+                            const currentQty = item.quantity ?? 0;
+                            if (
+                              typeof nextQty === 'number' &&
+                              nextQty !== currentQty
+                            ) {
+                              commitOrderItemPatch(item.id!, {
+                                quantity: nextQty,
+                              });
+                            }
+                          }}
+                        />
+                      ) : (
+                        item.quantity
+                      )}
                     </td>
                     <td
                       style={{
@@ -853,7 +1005,47 @@ const OrdersPage: React.FC = () => {
                         textAlign: 'right',
                       }}
                     >
-                      {item.discountPercent ?? 0}
+                      {selectedOrder.status === 'DRAFT' && item.id ? (
+                        <InputNumber
+                          size="small"
+                          min={0}
+                          max={100}
+                          step={1}
+                          precision={0}
+                          style={{ width: 90 }}
+                          value={
+                            itemEdits[item.id]?.discountPercent ??
+                            item.discountPercent ??
+                            0
+                          }
+                          disabled={savingItemId === item.id}
+                          onChange={(val) => {
+                            setItemEdits((prev) => ({
+                              ...prev,
+                              [item.id!]: {
+                                ...prev[item.id!],
+                                discountPercent:
+                                  typeof val === 'number' ? val : 0,
+                              },
+                            }));
+                          }}
+                          onBlur={() => {
+                            const nextDisc =
+                              itemEdits[item.id!]?.discountPercent;
+                            const currentDisc = item.discountPercent ?? 0;
+                            if (
+                              typeof nextDisc === 'number' &&
+                              nextDisc !== currentDisc
+                            ) {
+                              commitOrderItemPatch(item.id!, {
+                                discountPercent: nextDisc,
+                              });
+                            }
+                          }}
+                        />
+                      ) : (
+                        item.discountPercent ?? 0
+                      )}
                     </td>
                     <td
                       style={{
@@ -899,16 +1091,19 @@ const OrdersPage: React.FC = () => {
                                 item.id!,
                               );
                               setSelectedOrder(res.data);
-                              message.success('Item removed');
+                              message.success(
+                                t('message.itemRemoved', 'Item removed'),
+                              );
                               actionRef.current?.reload();
                             } catch (err: any) {
                               message.error(
-                                err?.data?.message || 'Remove failed',
+                                err?.data?.message ||
+                                  t('message.removeFailed', 'Remove failed'),
                               );
                             }
                           }}
                         >
-                          Remove
+                          {t('action.remove', 'Remove')}
                         </a>
                       </td>
                     )}
@@ -927,44 +1122,48 @@ const OrdersPage: React.FC = () => {
           setCustomerDrawerOpen(false);
           setCustomerDetails(null);
         }}
-        title={`Customer: ${customerDetails?.name || ''}`}
+        title={`${t('label.customer', 'Customer')}: ${
+          customerDetails?.name || ''
+        }`}
       >
         {customerDetails ? (
           <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="Name">
+            <Descriptions.Item label={t('label.name', 'Name')}>
               {customerDetails.name}
             </Descriptions.Item>
-            <Descriptions.Item label="Email">
+            <Descriptions.Item label={t('label.email', 'Email')}>
               {customerDetails.email || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Phone">
+            <Descriptions.Item label={t('label.phone', 'Phone')}>
               {customerDetails.phone || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="City">
+            <Descriptions.Item label={t('label.city', 'City')}>
               {customerDetails.city || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Country">
+            <Descriptions.Item label={t('label.country', 'Country')}>
               {customerDetails.countryCode || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Payment Terms (days)">
+            <Descriptions.Item
+              label={t('label.paymentTermsDays', 'Payment Terms (days)')}
+            >
               {customerDetails.paymentTermsDays ?? '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="VAT ID">
+            <Descriptions.Item label={t('label.vatId', 'VAT ID')}>
               {customerDetails.vatId || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Tax Number">
+            <Descriptions.Item label={t('label.taxNumber', 'Tax Number')}>
               {customerDetails.taxNumber || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Address">
+            <Descriptions.Item label={t('label.address', 'Address')}>
               {customerDetails.street || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Postal Code">
+            <Descriptions.Item label={t('label.postalCode', 'Postal Code')}>
               {customerDetails.postalCode || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Notes">
+            <Descriptions.Item label={t('label.notes', 'Notes')}>
               {customerDetails.notes || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Orders">
+            <Descriptions.Item label={t('page.orders', 'Orders')}>
               <a
                 onClick={() => {
                   history.push(
@@ -976,12 +1175,15 @@ const OrdersPage: React.FC = () => {
                   );
                 }}
               >
-                View orders for this customer
+                {t(
+                  'action.viewOrdersForCustomer',
+                  'View orders for this customer',
+                )}
               </a>
             </Descriptions.Item>
           </Descriptions>
         ) : (
-          <div>No customer data.</div>
+          <div>{t('empty.customer', 'No customer data.')}</div>
         )}
       </Drawer>
     </PageContainer>

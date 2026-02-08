@@ -5,6 +5,7 @@ import {
   listRoles,
   removeRole,
 } from '@/services/roles';
+import { useIntl } from '@umijs/max';
 import { Checkbox, Drawer, List, message, Space, Spin, Typography } from 'antd';
 import React, { useEffect, useMemo, useState } from 'react';
 
@@ -15,6 +16,9 @@ type Props = {
 };
 
 const UserRoleDrawer: React.FC<Props> = ({ open, userId, onClose }) => {
+  const intl = useIntl();
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -31,7 +35,10 @@ const UserRoleDrawer: React.FC<Props> = ({ open, userId, onClose }) => {
       setRoles(rolesRes.data || []);
       setUserRoleNames(userRolesRes.data || []);
     } catch (err: any) {
-      message.error(err?.data?.message || 'Failed to load roles');
+      message.error(
+        err?.data?.message ||
+          t('message.failedToLoadRoles', 'Failed to load roles'),
+      );
     } finally {
       setLoading(false);
     }
@@ -58,7 +65,9 @@ const UserRoleDrawer: React.FC<Props> = ({ open, userId, onClose }) => {
         setUserRoleNames((prev) => prev.filter((r) => r !== role.name));
       }
     } catch (err: any) {
-      message.error(err?.data?.message || 'Update failed');
+      message.error(
+        err?.data?.message || t('message.updateFailed', 'Update failed'),
+      );
     } finally {
       setSaving(false);
     }
@@ -66,14 +75,14 @@ const UserRoleDrawer: React.FC<Props> = ({ open, userId, onClose }) => {
 
   return (
     <Drawer
-      title="Manage Roles"
+      title={t('modal.manageRoles', 'Manage Roles')}
       open={open}
       width={360}
       onClose={onClose}
       destroyOnClose
       extra={
         <Typography.Text type="secondary">
-          {saving ? 'Saving...' : null}
+          {saving ? t('status.saving', 'Saving...') : null}
         </Typography.Text>
       }
     >

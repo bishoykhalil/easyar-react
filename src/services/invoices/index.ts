@@ -20,6 +20,8 @@ export interface InvoiceResponseDTO {
   invoiceNumber?: string;
   customerId: number;
   customerName: string;
+  createdByUserId?: number;
+  createdByName?: string;
   status: InvoiceStatus;
   recurring?: boolean;
   recurringPlanId?: number;

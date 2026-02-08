@@ -5,6 +5,7 @@ import {
   ProColumns,
   ProTable,
 } from '@ant-design/pro-components';
+import { useIntl } from '@umijs/max';
 import type { UploadProps } from 'antd';
 import { Avatar, Button, message, Space, Tag, Upload } from 'antd';
 import React, { useEffect, useState } from 'react';
@@ -13,6 +14,9 @@ import CreateUserModal from './components/CreateUserModal';
 import UserRoleDrawer from './components/UserRoleDrawer';
 
 const UsersPage: React.FC = () => {
+  const intl = useIntl();
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
   const [data, setData] = useState<UserDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [roleDrawerOpen, setRoleDrawerOpen] = useState(false);
@@ -26,7 +30,10 @@ const UsersPage: React.FC = () => {
       const res = await getAllUsers();
       setData(res.data || []);
     } catch (err: any) {
-      message.error(err?.data?.message || 'Failed to load users');
+      message.error(
+        err?.data?.message ||
+          t('message.failedToLoadUsers', 'Failed to load users'),
+      );
     } finally {
       setLoading(false);
     }
@@ -38,35 +45,35 @@ const UsersPage: React.FC = () => {
 
   const columns: ProColumns<UserDTO>[] = [
     {
-      title: 'ID',
+      title: t('table.id', 'ID'),
       dataIndex: 'id',
       width: 60,
     },
     {
-      title: 'Name',
+      title: t('table.name', 'Name'),
       dataIndex: 'name',
       ellipsis: true,
     },
     {
-      title: 'Email',
+      title: t('table.email', 'Email'),
       dataIndex: 'email',
       ellipsis: true,
     },
     {
-      title: 'Roles',
+      title: t('table.roles', 'Roles'),
       dataIndex: 'roles',
       render: (_, record) => (
         <Space size={[4, 4]} wrap>
           {record.roles?.length ? (
             record.roles.map((r) => <Tag key={r.id}>{r.name}</Tag>)
           ) : (
-            <Tag>NONE</Tag>
+            <Tag>{t('status.none', 'NONE')}</Tag>
           )}
         </Space>
       ),
     },
     {
-      title: 'Avatar',
+      title: t('table.avatar', 'Avatar'),
       dataIndex: 'profilePictureUrl',
       render: (_, record) =>
         record.profilePictureUrl ? (
@@ -76,7 +83,7 @@ const UsersPage: React.FC = () => {
         ),
     },
     {
-      title: 'Actions',
+      title: t('table.actions', 'Actions'),
       valueType: 'option',
       render: (_, record) => {
         const uploadProps: UploadProps = {
@@ -84,11 +91,16 @@ const UsersPage: React.FC = () => {
           customRequest: async ({ file, onSuccess, onError }) => {
             try {
               const res = await uploadProfilePicture(file as File);
-              message.success('Profile picture updated');
+              message.success(
+                t('message.profileUpdated', 'Profile picture updated'),
+              );
               onSuccess?.(res);
               fetchUsers();
             } catch (err: any) {
-              message.error(err?.data?.message || 'Upload failed');
+              message.error(
+                err?.data?.message ||
+                  t('message.uploadFailed', 'Upload failed'),
+              );
               onError?.(err);
             }
           },
@@ -103,11 +115,11 @@ const UsersPage: React.FC = () => {
                 setRoleDrawerOpen(true);
               }}
             >
-              Roles
+              {t('label.roles', 'Roles')}
             </Button>
             <Upload {...uploadProps}>
               <Button size="small" icon={<UploadOutlined />}>
-                Avatar
+                {t('table.avatar', 'Avatar')}
               </Button>
             </Upload>
           </Space>
@@ -126,10 +138,10 @@ const UsersPage: React.FC = () => {
         search={false}
         toolBarRender={() => [
           <Button key="new" type="primary" onClick={() => setCreateOpen(true)}>
-            New User
+            {t('action.newUser', 'New User')}
           </Button>,
           <Button key="new-role" onClick={() => setCreateRoleOpen(true)}>
-            New Role
+            {t('action.newRole', 'New Role')}
           </Button>,
         ]}
         pagination={{

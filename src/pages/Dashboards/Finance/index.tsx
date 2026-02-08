@@ -3,12 +3,14 @@ import {
   type InvoiceResponseDTO,
 } from '@/services/invoices';
 import { PageContainer } from '@ant-design/pro-components';
+import { getLocale, useIntl } from '@umijs/max';
 import { Card, Col, Progress, Row, Space, Table, Typography } from 'antd';
 import React, { useEffect, useMemo, useState } from 'react';
 import styles from '../styles.less';
 
 const FinanceDashboard: React.FC = () => {
-  const money = new Intl.NumberFormat('en', {
+  const intl = useIntl();
+  const money = new Intl.NumberFormat(getLocale(), {
     style: 'currency',
     currency: 'EUR',
   });
@@ -36,6 +38,8 @@ const FinanceDashboard: React.FC = () => {
   }, []);
 
   const parseDate = (value?: string) => (value ? new Date(value) : null);
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
 
   const summary = useMemo(() => {
     const paid = invoices.filter((inv) => inv.status === 'PAID');
@@ -123,15 +127,27 @@ const FinanceDashboard: React.FC = () => {
   }, [invoices]);
 
   return (
-    <PageContainer title="Finance Overview">
+    <PageContainer title={t('page.dashboards.finance', 'Finance Overview')}>
       <div className={styles.container}>
         <Row gutter={[16, 16]}>
           {[
-            { title: 'Total revenue', value: summary.total },
-            { title: 'Paid', value: summary.paid },
-            { title: 'Outstanding', value: summary.open },
-            { title: 'Overdue', value: summary.overdue },
-            { title: 'Late fees', value: summary.lateFees },
+            {
+              title: t('dash.finance.kpi.totalRevenue', 'Total revenue'),
+              value: summary.total,
+            },
+            { title: t('dash.finance.kpi.paid', 'Paid'), value: summary.paid },
+            {
+              title: t('dash.finance.kpi.outstanding', 'Outstanding'),
+              value: summary.open,
+            },
+            {
+              title: t('dash.finance.kpi.overdue', 'Overdue'),
+              value: summary.overdue,
+            },
+            {
+              title: t('dash.finance.kpi.lateFees', 'Late fees'),
+              value: summary.lateFees,
+            },
           ].map((kpi) => (
             <Col xs={24} sm={12} lg={4} key={kpi.title}>
               <Card className={styles.card} bordered>
@@ -150,7 +166,10 @@ const FinanceDashboard: React.FC = () => {
 
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={16}>
-            <Card className={styles.card} title="Revenue by month">
+            <Card
+              className={styles.card}
+              title={t('dash.finance.revenueByMonth', 'Revenue by month')}
+            >
               <Table
                 className={styles.table}
                 size="small"
@@ -158,27 +177,27 @@ const FinanceDashboard: React.FC = () => {
                 loading={loading}
                 dataSource={monthRows}
                 columns={[
-                  { title: 'Month', dataIndex: 'month' },
+                  { title: t('table.month', 'Month'), dataIndex: 'month' },
                   {
-                    title: 'Net',
+                    title: t('table.net', 'Net'),
                     dataIndex: 'net',
                     align: 'right',
                     render: (val: number) => money.format(val),
                   },
                   {
-                    title: 'Gross',
+                    title: t('table.gross', 'Gross'),
                     dataIndex: 'gross',
                     align: 'right',
                     render: (val: number) => money.format(val),
                   },
                   {
-                    title: 'Paid',
+                    title: t('table.paid', 'Paid'),
                     dataIndex: 'paid',
                     align: 'right',
                     render: (val: number) => money.format(val),
                   },
                   {
-                    title: 'Outstanding',
+                    title: t('table.outstanding', 'Outstanding'),
                     dataIndex: 'outstanding',
                     align: 'right',
                     render: (val: number, record: any) => (
@@ -201,7 +220,10 @@ const FinanceDashboard: React.FC = () => {
             </Card>
           </Col>
           <Col xs={24} lg={8}>
-            <Card className={styles.card} title="AR aging">
+            <Card
+              className={styles.card}
+              title={t('dash.finance.arAging', 'AR aging')}
+            >
               <Table
                 className={styles.table}
                 size="small"
@@ -214,9 +236,17 @@ const FinanceDashboard: React.FC = () => {
                   amount: money.format(b.amount),
                 }))}
                 columns={[
-                  { title: 'Bucket', dataIndex: 'bucket' },
-                  { title: 'Count', dataIndex: 'count', align: 'center' },
-                  { title: 'Amount', dataIndex: 'amount', align: 'right' },
+                  { title: t('table.bucket', 'Bucket'), dataIndex: 'bucket' },
+                  {
+                    title: t('table.count', 'Count'),
+                    dataIndex: 'count',
+                    align: 'center',
+                  },
+                  {
+                    title: t('table.amount', 'Amount'),
+                    dataIndex: 'amount',
+                    align: 'right',
+                  },
                 ]}
               />
             </Card>

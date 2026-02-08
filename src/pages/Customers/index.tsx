@@ -13,7 +13,7 @@ import {
   ProTable,
   type ProColumns,
 } from '@ant-design/pro-components';
-import { history } from '@umijs/max';
+import { history, useIntl } from '@umijs/max';
 import { Button, message, Popconfirm, Space } from 'antd';
 import React, { useRef, useState } from 'react';
 import OrderForm from '../Orders/components/OrderForm';
@@ -22,6 +22,7 @@ import CustomerForm from './components/CustomerForm';
 
 const CustomersPage: React.FC = () => {
   const actionRef = useRef<any>();
+  const intl = useIntl();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CustomerDTO | undefined>(undefined);
   const [orderFormOpen, setOrderFormOpen] = useState(false);
@@ -31,9 +32,12 @@ const CustomersPage: React.FC = () => {
     CustomerDTO | undefined
   >(undefined);
 
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
+
   const columns: ProColumns<CustomerDTO>[] = [
     {
-      title: 'Name',
+      title: t('table.name', 'Name'),
       dataIndex: 'name',
       ellipsis: true,
       renderFormItem: (_, { type, ...rest }) => {
@@ -43,7 +47,7 @@ const CustomersPage: React.FC = () => {
             {...rest}
             showSearch
             allowClear
-            placeholder="Search name"
+            placeholder={t('placeholder.searchName', 'Search name')}
             debounceTime={300}
             request={async ({ keyWords }) => {
               const res = await listCustomers({
@@ -65,7 +69,7 @@ const CustomersPage: React.FC = () => {
       },
     },
     {
-      title: 'City',
+      title: t('table.city', 'City'),
       dataIndex: 'city',
       renderFormItem: (_, { type, ...rest }) => {
         if (type === 'form') return null;
@@ -74,7 +78,7 @@ const CustomersPage: React.FC = () => {
             {...rest}
             showSearch
             allowClear
-            placeholder="Search city"
+            placeholder={t('placeholder.searchCity', 'Search city')}
             debounceTime={300}
             request={async ({ keyWords }) => {
               const res = await listCustomers({
@@ -94,7 +98,7 @@ const CustomersPage: React.FC = () => {
       },
     },
     {
-      title: 'Actions',
+      title: t('table.actions', 'Actions'),
       valueType: 'option',
       render: (_, record) => (
         <Space size={12}>
@@ -104,21 +108,24 @@ const CustomersPage: React.FC = () => {
               setFormOpen(true);
             }}
           >
-            Edit
+            {t('action.edit', 'Edit')}
           </a>
           <Popconfirm
-            title="Delete customer?"
+            title={t('message.customerDeleteConfirm', 'Delete customer?')}
             onConfirm={async () => {
               try {
                 await deleteCustomer(record.id!);
-                message.success('Deleted');
+                message.success(t('message.deleted', 'Deleted'));
                 actionRef.current?.reload();
               } catch (err: any) {
-                message.error(err?.data?.message || 'Delete failed');
+                message.error(
+                  err?.data?.message ||
+                    t('message.deleteFailed', 'Delete failed'),
+                );
               }
             }}
           >
-            <a style={{ color: 'red' }}>Delete</a>
+            <a style={{ color: 'red' }}>{t('action.delete', 'Delete')}</a>
           </Popconfirm>
           <a
             onClick={() => {
@@ -126,7 +133,7 @@ const CustomersPage: React.FC = () => {
               setDetailsOpen(true);
             }}
           >
-            Details
+            {t('action.details', 'Details')}
           </a>
           <a
             onClick={() => {
@@ -137,7 +144,7 @@ const CustomersPage: React.FC = () => {
               );
             }}
           >
-            New Order
+            {t('action.newOrder', 'New Order')}
           </a>
           <Button
             type="link"
@@ -151,7 +158,7 @@ const CustomersPage: React.FC = () => {
             }}
             style={{ padding: 0 }}
           >
-            View Orders
+            {t('action.viewOrders', 'View Orders')}
           </Button>
         </Space>
       ),
@@ -186,12 +193,15 @@ const CustomersPage: React.FC = () => {
               total: res.data?.length || 0,
             };
           } catch (err: any) {
-            message.error(err?.data?.message || 'Failed to load customers');
+            message.error(
+              err?.data?.message ||
+                t('message.failedToLoadCustomers', 'Failed to load customers'),
+            );
             return { data: [], success: false };
           }
         }}
         toolbar={{
-          title: 'Customers',
+          title: t('page.customers', 'Customers'),
           actions: [
             <Button
               key="new"
@@ -201,7 +211,7 @@ const CustomersPage: React.FC = () => {
                 setFormOpen(true);
               }}
             >
-              New Customer
+              {t('action.newCustomer', 'New Customer')}
             </Button>,
           ],
         }}
@@ -217,12 +227,15 @@ const CustomersPage: React.FC = () => {
         onFinish={async (values) => {
           try {
             await createOrder(values);
-            message.success('Order created');
+            message.success(t('message.orderCreated', 'Order created'));
             setOrderFormOpen(false);
             setOrderInitial(undefined);
             return true;
           } catch (err: any) {
-            message.error(err?.data?.message || 'Create order failed');
+            message.error(
+              err?.data?.message ||
+                t('message.orderCreateFailed', 'Create order failed'),
+            );
             return false;
           }
         }}
@@ -251,11 +264,17 @@ const CustomersPage: React.FC = () => {
             } else {
               await createCustomer(values);
             }
-            message.success(editing?.id ? 'Updated' : 'Created');
+            message.success(
+              editing?.id
+                ? t('message.updated', 'Updated')
+                : t('message.created', 'Created'),
+            );
             actionRef.current?.reload();
             return true;
           } catch (err: any) {
-            message.error(err?.data?.message || 'Save failed');
+            message.error(
+              err?.data?.message || t('message.saveFailed', 'Save failed'),
+            );
             return false;
           }
         }}

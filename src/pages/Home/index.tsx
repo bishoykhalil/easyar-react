@@ -4,7 +4,7 @@ import {
 } from '@/services/invoices';
 import { listPlans, type RecurringPlanDTO } from '@/services/recurring';
 import { PageContainer } from '@ant-design/pro-components';
-import { history } from '@umijs/max';
+import { getLocale, history, useIntl } from '@umijs/max';
 import {
   Button,
   Card,
@@ -14,29 +14,35 @@ import {
   Space,
   Table,
   Tag,
-  Timeline,
   Typography,
 } from 'antd';
 import React, { useEffect, useMemo, useState } from 'react';
 import styles from './index.less';
 
 const HomePage: React.FC = () => {
-  const money = new Intl.NumberFormat('en', {
+  const intl = useIntl();
+  const money = new Intl.NumberFormat(getLocale(), {
     style: 'currency',
     currency: 'EUR',
   });
   const openStatuses = ['ISSUED', 'SENT', 'RETURNED', 'OVERDUE'];
+  const t = (
+    id: string,
+    defaultMessage: string,
+    values?: Record<string, any>,
+  ) => intl.formatMessage({ id, defaultMessage }, values);
+
+  const statusLabel = (status: string) =>
+    t(`status.${status.toLowerCase()}`, status);
+  const riskLabel = (risk: string) => t(`status.${risk.toLowerCase()}`, risk);
 
   const [invoices, setInvoices] = useState<InvoiceResponseDTO[]>([]);
   const [plans, setPlans] = useState<RecurringPlanDTO[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
-  const [loadingPlans, setLoadingPlans] = useState(false);
-  const [activeTrendIndex, setActiveTrendIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
       setLoadingInvoices(true);
-      setLoadingPlans(true);
       try {
         const res = await listInvoicesPaged({
           q: '%',
@@ -55,8 +61,6 @@ const HomePage: React.FC = () => {
         setPlans(res.data || []);
       } catch {
         setPlans([]);
-      } finally {
-        setLoadingPlans(false);
       }
     };
     load();
@@ -116,130 +120,47 @@ const HomePage: React.FC = () => {
 
     return [
       {
-        title: 'Open invoices',
+        title: t('home.kpi.openInvoices', 'Open invoices'),
         value: String(open.length),
-        note: `${dueSoon.length} due this week`,
+        note: intl.formatMessage(
+          {
+            id: 'home.kpi.dueThisWeek',
+            defaultMessage: '{count} due this week',
+          },
+          { count: dueSoon.length },
+        ),
       },
       {
-        title: 'Overdue amount',
+        title: t('home.kpi.overdueAmount', 'Overdue amount'),
         value: money.format(
           overdue.reduce((sum, inv) => sum + (inv.totalGross || 0), 0),
         ),
-        note: `${overdue.length} invoices overdue`,
+        note: intl.formatMessage(
+          {
+            id: 'home.kpi.invoicesOverdue',
+            defaultMessage: '{count} invoices overdue',
+          },
+          { count: overdue.length },
+        ),
       },
       {
-        title: 'Recurring revenue',
+        title: t('home.kpi.recurringRevenue', 'Recurring revenue'),
         value: money.format(recurringTotal),
-        note: 'This month',
+        note: t('home.kpi.thisMonth', 'This month'),
       },
       {
-        title: 'Active plans',
+        title: t('home.kpi.activePlans', 'Active plans'),
         value: String(activePlans.length),
-        note: `${pausedPlans.length} paused, ${expiringPlans.length} expiring`,
+        note: intl.formatMessage(
+          {
+            id: 'home.kpi.plansNote',
+            defaultMessage: '{paused} paused, {expiring} expiring',
+          },
+          { paused: pausedPlans.length, expiring: expiringPlans.length },
+        ),
       },
     ];
   }, [invoices, plans, money]);
-
-  const revenueTrend = useMemo(() => {
-    const now = new Date();
-    const months = Array.from({ length: 6 }).map((_, index) => {
-      const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
-      const label = date.toLocaleString('en', { month: 'short' });
-      return {
-        key: `${date.getFullYear()}-${date.getMonth() + 1}`,
-        label,
-        start: new Date(date.getFullYear(), date.getMonth(), 1),
-        end: new Date(date.getFullYear(), date.getMonth() + 1, 1),
-      };
-    });
-    return months.map((month) => {
-      let net = 0;
-      let gross = 0;
-      invoices.forEach((inv) => {
-        const date = parseDate(inv.issuedAt || inv.createdAt);
-        if (!date || date < month.start || date >= month.end) return;
-        net += inv.totalNet || 0;
-        gross += inv.totalGross || 0;
-      });
-      return { label: month.label, net, gross };
-    });
-  }, [invoices]);
-
-  const revenueMax = useMemo(() => {
-    const values = revenueTrend.flatMap((d) => [d.net, d.gross]);
-    return Math.max(1, ...values);
-  }, [revenueTrend]);
-
-  const chartPoints = useMemo(() => {
-    const paddingX = 2;
-    const paddingY = 6;
-    const width = 100 - paddingX * 2;
-    const height = 40 - paddingY * 2;
-    const count = revenueTrend.length > 1 ? revenueTrend.length - 1 : 1;
-    return revenueTrend.map((point, index) => {
-      const x = paddingX + (index / count) * width;
-      const netRatio = point.net / revenueMax;
-      const grossRatio = point.gross / revenueMax;
-      const yNet = 40 - paddingY - netRatio * height;
-      const yGross = 40 - paddingY - grossRatio * height;
-      return { ...point, x, yNet, yGross };
-    });
-  }, [revenueTrend, revenueMax]);
-
-  const chartNetLine = useMemo(
-    () => chartPoints.map((p) => `${p.x},${p.yNet}`).join(' '),
-    [chartPoints],
-  );
-
-  const chartGrossLine = useMemo(
-    () => chartPoints.map((p) => `${p.x},${p.yGross}`).join(' '),
-    [chartPoints],
-  );
-
-  const chartGrossArea = useMemo(() => {
-    if (!chartPoints.length) return '';
-    const paddingY = 6;
-    const baseY = 40 - paddingY;
-    return [
-      `M ${chartPoints[0].x},${baseY}`,
-      ...chartPoints.map((p) => `L ${p.x},${p.yGross}`),
-      `L ${chartPoints[chartPoints.length - 1].x},${baseY}`,
-      'Z',
-    ].join(' ');
-  }, [chartPoints]);
-
-  const activePoint =
-    activeTrendIndex !== null ? chartPoints[activeTrendIndex] : null;
-  const tooltipLeft = activePoint
-    ? Math.min(90, Math.max(10, activePoint.x))
-    : 0;
-
-  const cashflow = useMemo(() => {
-    const open = invoices.filter((inv) => openStatuses.includes(inv.status));
-    const buckets = [
-      { label: '0-30', min: 1, max: 30, count: 0, amount: 0 },
-      { label: '31-60', min: 31, max: 60, count: 0, amount: 0 },
-      { label: '61-90', min: 61, max: 90, count: 0, amount: 0 },
-      { label: '90+', min: 91, max: Infinity, count: 0, amount: 0 },
-    ];
-    let totalOverdue = 0;
-    const now = new Date();
-    open.forEach((inv) => {
-      const due = parseDate(inv.dueDate);
-      if (!due) return;
-      const days = Math.floor(
-        (now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24),
-      );
-      if (days <= 0) return;
-      totalOverdue += inv.totalGross || 0;
-      const bucket = buckets.find((b) => days >= b.min && days <= b.max);
-      if (bucket) {
-        bucket.count += 1;
-        bucket.amount += inv.totalGross || 0;
-      }
-    });
-    return { buckets, totalOverdue };
-  }, [invoices, openStatuses]);
 
   const invoiceFunnel = useMemo(() => {
     const statuses = ['ISSUED', 'SENT', 'PAID', 'RETURNED', 'OVERDUE'];
@@ -254,62 +175,71 @@ const HomePage: React.FC = () => {
     [invoiceFunnel],
   );
 
-  const upcomingRuns = useMemo(() => {
-    const activePlans = plans.filter((p) => p.status === 'ACTIVE' || p.active);
-    const sorted = [...activePlans].sort((a, b) => {
-      const aDate = parseDate(a.nextRunDate)?.getTime() || 0;
-      const bDate = parseDate(b.nextRunDate)?.getTime() || 0;
-      return aDate - bDate;
-    });
-    const calcAmount = (plan: RecurringPlanDTO) => {
-      return plan.items.reduce((sum, item) => {
-        const qty = item.quantity || 0;
-        const unit = item.unitPriceNet || 0;
-        const discount = item.discountPercent || 0;
-        const net = qty * unit * (1 - discount / 100);
-        const vat = net * (item.vatRate || 0);
-        return sum + net + vat;
-      }, 0);
-    };
+  const todayActions = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const horizon = new Date(today);
-    horizon.setDate(today.getDate() + 30);
-    horizon.setHours(23, 59, 59, 999);
-    return sorted
-      .filter((plan) => {
-        const next = parseDate(plan.nextRunDate);
-        return next && next >= today && next <= horizon;
-      })
-      .map((plan) => ({
-        key: plan.id,
-        plan: `Plan #${plan.id}`,
-        customer: plan.customerName,
-        nextRun: plan.nextRunDate,
-        amount: money.format(calcAmount(plan)),
-        status: plan.status || (plan.active ? 'ACTIVE' : 'PAUSED'),
-      }))
-      .slice(0, 8);
-  }, [plans, money]);
+    const unsentIssued = invoices.filter(
+      (inv) => inv.status === 'ISSUED' && !inv.sentAt,
+    ).length;
+    const overdue = invoices.filter(
+      (inv) => inv.overdue || inv.status === 'OVERDUE',
+    ).length;
+    const returned = invoices.filter((inv) => inv.status === 'RETURNED').length;
+    const runsToday = plans.filter((plan) => {
+      const next = parseDate(plan.nextRunDate);
+      const active = plan.status === 'ACTIVE' || plan.active;
+      return (
+        active &&
+        next &&
+        next.getFullYear() === today.getFullYear() &&
+        next.getMonth() === today.getMonth() &&
+        next.getDate() === today.getDate()
+      );
+    }).length;
+    return { unsentIssued, overdue, returned, runsToday };
+  }, [invoices, plans]);
 
-  const openInvoices = useMemo(() => {
-    const open = invoices.filter((inv) => openStatuses.includes(inv.status));
-    const sorted = [...open].sort((a, b) => {
-      const aDate = parseDate(a.dueDate)?.getTime() || 0;
-      const bDate = parseDate(b.dueDate)?.getTime() || 0;
-      return aDate - bDate;
-    });
-    return sorted.slice(0, 5).map((inv) => ({
-      key: inv.id,
-      invoice: inv.invoiceNumber || `#${inv.id}`,
-      customer: inv.customerName,
-      status: inv.status,
-      dueDate: inv.dueDate || '-',
-      amount: money.format(inv.totalGross || 0),
-    }));
-  }, [invoices, money]);
+  const cashInForecast = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const weeks = [
+      { label: t('home.forecast.w1', '0-7 days'), from: 0, to: 7 },
+      { label: t('home.forecast.w2', '8-14 days'), from: 8, to: 14 },
+      { label: t('home.forecast.w3', '15-21 days'), from: 15, to: 21 },
+      { label: t('home.forecast.w4', '22-30 days'), from: 22, to: 30 },
+    ].map((w) => ({ ...w, count: 0, amount: 0 }));
 
-  const topCustomers = useMemo(() => {
+    invoices
+      .filter((inv) => openStatuses.includes(inv.status))
+      .forEach((inv) => {
+        const due = parseDate(inv.dueDate);
+        if (!due) return;
+        due.setHours(0, 0, 0, 0);
+        const diff = Math.floor(
+          (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        );
+        const bucket = weeks.find((w) => diff >= w.from && diff <= w.to);
+        if (!bucket) return;
+        bucket.count += 1;
+        bucket.amount += inv.totalGross || 0;
+      });
+    return weeks;
+  }, [invoices, openStatuses, t]);
+
+  const collectionPerformance = useMemo(() => {
+    const total = invoices.length || 1;
+    const paid = invoices.filter((i) => i.status === 'PAID').length;
+    const overdue = invoices.filter(
+      (i) => i.overdue || i.status === 'OVERDUE',
+    ).length;
+    const returned = invoices.filter((i) => i.status === 'RETURNED').length;
+    const onTimePct = Math.round((paid / total) * 100);
+    const overduePct = Math.round((overdue / total) * 100);
+    const returnedPct = Math.round((returned / total) * 100);
+    return { onTimePct, overduePct, returnedPct, total };
+  }, [invoices]);
+
+  const topRisks = useMemo(() => {
     const map = new Map<
       string,
       {
@@ -359,6 +289,84 @@ const HomePage: React.FC = () => {
       .slice(0, 5);
   }, [invoices, openStatuses]);
 
+  const recentActivity = useMemo(() => {
+    const rows: {
+      key: string;
+      when: Date;
+      title: string;
+      detail: string;
+    }[] = [];
+
+    invoices.forEach((inv) => {
+      const base = inv.invoiceNumber || `#${inv.id}`;
+      const issuedAt = parseDate(inv.issuedAt || inv.createdAt);
+      const sentAt = parseDate(inv.sentAt);
+      const paidAt = parseDate(inv.paidAt);
+      const returnedAt = parseDate(inv.returnedAt);
+      if (issuedAt) {
+        rows.push({
+          key: `inv-issued-${inv.id}`,
+          when: issuedAt,
+          title: t('activity.invoiceIssued', 'Invoice issued'),
+          detail: `${base} • ${inv.customerName || '-'}`,
+        });
+      }
+      if (sentAt) {
+        rows.push({
+          key: `inv-sent-${inv.id}`,
+          when: sentAt,
+          title: t('activity.invoiceSent', 'Invoice sent'),
+          detail: `${base} • ${inv.customerName || '-'}`,
+        });
+      }
+      if (paidAt) {
+        rows.push({
+          key: `inv-paid-${inv.id}`,
+          when: paidAt,
+          title: t('activity.invoicePaid', 'Invoice paid'),
+          detail: `${base} • ${money.format(inv.totalGross || 0)}`,
+        });
+      }
+      if (returnedAt) {
+        rows.push({
+          key: `inv-returned-${inv.id}`,
+          when: returnedAt,
+          title: t('activity.invoiceReturned', 'Invoice returned'),
+          detail: `${base} • ${inv.customerName || '-'}`,
+        });
+      }
+    });
+
+    plans.forEach((plan) => {
+      const createdAt = parseDate(plan.createdAt);
+      if (createdAt) {
+        rows.push({
+          key: `plan-created-${plan.id}`,
+          when: createdAt,
+          title: t('activity.planCreated', 'Recurring plan created'),
+          detail: `Plan #${plan.id} • ${plan.customerName || '-'}`,
+        });
+      }
+      const lastRunDate = parseDate(plan.lastRunDate);
+      if (lastRunDate) {
+        rows.push({
+          key: `plan-run-${plan.id}`,
+          when: lastRunDate,
+          title: t('activity.planRun', 'Recurring run generated'),
+          detail: `Plan #${plan.id} • ${plan.customerName || '-'}`,
+        });
+      }
+    });
+
+    return rows
+      .sort((a, b) => b.when.getTime() - a.when.getTime())
+      .slice(0, 8)
+      .map((r) => ({
+        ...r,
+        whenText: r.when.toLocaleString(getLocale() || 'en-US'),
+      }));
+  }, [invoices, plans, money, t]);
+
   const alerts = useMemo(() => {
     const items: {
       key: number;
@@ -372,8 +380,12 @@ const HomePage: React.FC = () => {
     if (overdue.length) {
       items.push({
         key: 1,
-        title: 'Overdue invoices',
-        detail: `${overdue.length} invoices need attention`,
+        title: t('home.alert.overdueInvoices.title', 'Overdue invoices'),
+        detail: t(
+          'home.alert.overdueInvoices.detail',
+          '{count} invoices need attention',
+          { count: overdue.length },
+        ),
         tone: 'error',
       });
     }
@@ -384,8 +396,12 @@ const HomePage: React.FC = () => {
     if (paused.length) {
       items.push({
         key: 2,
-        title: 'Plans paused',
-        detail: `${paused.length} recurring plans are paused`,
+        title: t('home.alert.plansPaused.title', 'Plans paused'),
+        detail: t(
+          'home.alert.plansPaused.detail',
+          '{count} recurring plans are paused',
+          { count: paused.length },
+        ),
         tone: 'warning',
       });
     }
@@ -397,8 +413,12 @@ const HomePage: React.FC = () => {
     if (expiring.length) {
       items.push({
         key: 3,
-        title: 'Plans expiring soon',
-        detail: `${expiring.length} plan(s) have 1 run left`,
+        title: t('home.alert.plansExpiring.title', 'Plans expiring soon'),
+        detail: t(
+          'home.alert.plansExpiring.detail',
+          '{count} plan(s) have 1 run left',
+          { count: expiring.length },
+        ),
         tone: 'info',
       });
     }
@@ -409,8 +429,15 @@ const HomePage: React.FC = () => {
     if (missingTerms.length) {
       items.push({
         key: 4,
-        title: 'Missing payment terms',
-        detail: `${missingTerms.length} invoice(s) without payment terms`,
+        title: t(
+          'home.alert.missingPaymentTerms.title',
+          'Missing payment terms',
+        ),
+        detail: t(
+          'home.alert.missingPaymentTerms.detail',
+          '{count} invoice(s) without payment terms',
+          { count: missingTerms.length },
+        ),
         tone: 'warning',
       });
     }
@@ -420,8 +447,12 @@ const HomePage: React.FC = () => {
     if (plansWithoutItems.length) {
       items.push({
         key: 5,
-        title: 'Plans without items',
-        detail: `${plansWithoutItems.length} plan(s) have no items`,
+        title: t('home.alert.plansWithoutItems.title', 'Plans without items'),
+        detail: t(
+          'home.alert.plansWithoutItems.detail',
+          '{count} plan(s) have no items',
+          { count: plansWithoutItems.length },
+        ),
         tone: 'error',
       });
     }
@@ -431,8 +462,12 @@ const HomePage: React.FC = () => {
     if (notSent.length) {
       items.push({
         key: 6,
-        title: 'Invoices not sent',
-        detail: `${notSent.length} issued invoice(s) without email sent`,
+        title: t('home.alert.invoicesNotSent.title', 'Invoices not sent'),
+        detail: t(
+          'home.alert.invoicesNotSent.detail',
+          '{count} issued invoice(s) without email sent',
+          { count: notSent.length },
+        ),
         tone: 'info',
       });
     }
@@ -440,7 +475,7 @@ const HomePage: React.FC = () => {
   }, [invoices, plans]);
 
   return (
-    <PageContainer>
+    <PageContainer title={t('page.home', 'Home')}>
       <div className={styles.container}>
         <Row gutter={[16, 16]}>
           {kpis.map((kpi) => (
@@ -460,141 +495,110 @@ const HomePage: React.FC = () => {
           ))}
         </Row>
 
-        <Row gutter={[16, 16]} className={styles.topRow}>
+        <Row gutter={[16, 16]}>
           <Col xs={24} lg={16}>
             <Card
-              className={`${styles.card} ${styles.stretchCard}`}
-              title="Revenue trend"
+              className={styles.card}
+              title={t('home.todayActions', 'Today actions')}
             >
-              <div className={styles.chartWrapper}>
-                <div className={styles.chartContainer}>
-                  <svg
-                    className={styles.chart}
-                    viewBox="0 0 170 40"
-                    preserveAspectRatio="none"
-                    onMouseLeave={() => setActiveTrendIndex(null)}
-                  >
-                    <defs>
-                      <linearGradient
-                        id="grossFill"
-                        x1="0"
-                        x2="0"
-                        y1="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="0%"
-                          stopColor="#22c55e"
-                          stopOpacity="0.35"
-                        />
-                        <stop
-                          offset="100%"
-                          stopColor="#22c55e"
-                          stopOpacity="0"
-                        />
-                      </linearGradient>
-                    </defs>
-                    {[8, 16, 24, 32].map((y) => (
-                      <line
-                        key={y}
-                        x1="2"
-                        y1={y}
-                        x2="98"
-                        y2={y}
-                        className={styles.chartGrid}
-                      />
-                    ))}
-                    {chartGrossArea && (
-                      <path d={chartGrossArea} fill="url(#grossFill)" />
-                    )}
-                    <polyline
-                      fill="none"
-                      stroke="#22c55e"
-                      strokeWidth=".3"
-                      points={chartGrossLine}
-                    />
-                    <polyline
-                      fill="none"
-                      stroke="#2563eb"
-                      strokeWidth=".3"
-                      points={chartNetLine}
-                    />
-                    {chartPoints.map((point, index) => (
-                      <g key={`${point.label}-${index}`}>
-                        <circle
-                          cx={point.x}
-                          cy={point.yNet}
-                          r={activeTrendIndex === index ? 1.3 : 0.9}
-                          className={styles.chartDotNet}
-                          onMouseEnter={() => setActiveTrendIndex(index)}
-                        />
-                        <circle
-                          cx={point.x}
-                          cy={point.yGross}
-                          r={activeTrendIndex === index ? 1.3 : 0.9}
-                          className={styles.chartDotGross}
-                          onMouseEnter={() => setActiveTrendIndex(index)}
-                        />
-                      </g>
-                    ))}
-                    {chartPoints.map((point, index) => (
-                      <text
-                        key={`label-${point.label}-${index}`}
-                        x={point.x}
-                        y={39}
-                        textAnchor="middle"
-                        className={styles.chartText}
-                      >
-                        {point.label}
-                      </text>
-                    ))}
-                  </svg>
-                  {activePoint && (
-                    <div
-                      className={styles.chartTooltip}
-                      style={{ left: `${tooltipLeft}%` }}
-                    >
-                      <div className={styles.tooltipTitle}>
-                        {activePoint.label}
-                      </div>
-                      <div className={styles.tooltipRow}>
-                        <span className={styles.tooltipDotNet} />
-                        Net {money.format(activePoint.net)}
-                      </div>
-                      <div className={styles.tooltipRow}>
-                        <span className={styles.tooltipDotGross} />
-                        Gross {money.format(activePoint.gross)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className={styles.legend}>
-                  <span>
-                    <span
-                      className={styles.legendDot}
-                      style={{ background: '#2563eb' }}
-                    />
-                    Net
-                  </span>
-                  <span>
-                    <span
-                      className={styles.legendDot}
-                      style={{ background: '#22c55e' }}
-                    />
-                    Gross
-                  </span>
-                </div>
+              <div className={styles.actionGrid}>
+                <button
+                  type="button"
+                  className={styles.actionTile}
+                  onClick={() =>
+                    history.push('/billing/invoices?status=ISSUED')
+                  }
+                >
+                  <div className={styles.actionCount}>
+                    {todayActions.unsentIssued}
+                  </div>
+                  <div className={styles.actionLabel}>
+                    {t('home.action.unsentIssued', 'Unsent issued invoices')}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={styles.actionTile}
+                  onClick={() =>
+                    history.push('/billing/invoices?status=OVERDUE')
+                  }
+                >
+                  <div className={styles.actionCount}>
+                    {todayActions.overdue}
+                  </div>
+                  <div className={styles.actionLabel}>
+                    {t('home.action.overdue', 'Overdue invoices')}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={styles.actionTile}
+                  onClick={() => history.push('/billing/recurring-plans')}
+                >
+                  <div className={styles.actionCount}>
+                    {todayActions.runsToday}
+                  </div>
+                  <div className={styles.actionLabel}>
+                    {t('home.action.runsToday', 'Recurring runs due today')}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={styles.actionTile}
+                  onClick={() =>
+                    history.push('/billing/invoices?status=RETURNED')
+                  }
+                >
+                  <div className={styles.actionCount}>
+                    {todayActions.returned}
+                  </div>
+                  <div className={styles.actionLabel}>
+                    {t('home.action.returned', 'Returned invoices')}
+                  </div>
+                </button>
               </div>
             </Card>
           </Col>
           <Col xs={24} lg={8}>
             <Card
+              className={styles.card}
+              title={t('home.quickActions', 'Quick actions')}
+            >
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Button block onClick={() => history.push('/billing/orders')}>
+                  {t('action.newOrder', 'New Order')}
+                </Button>
+                <Button block onClick={() => history.push('/billing/invoices')}>
+                  {t('action.newFromOrder', 'New from Order')}
+                </Button>
+                <Button
+                  block
+                  onClick={() => history.push('/billing/recurring-plans')}
+                >
+                  {t('action.generateNow', 'Generate Now')}
+                </Button>
+                <Button
+                  block
+                  onClick={() =>
+                    history.push('/billing/invoices?status=OVERDUE')
+                  }
+                >
+                  {t('action.viewOverdue', 'View overdue')}
+                </Button>
+              </Space>
+            </Card>
+          </Col>
+        </Row>
+
+        <Row gutter={[16, 16]} className={styles.topRow}>
+          <Col xs={24} lg={8}>
+            <Card
               className={`${styles.card} ${styles.stretchCard}`}
-              title="Invoice funnel"
+              title={t('home.invoiceFunnel.title', 'Invoice funnel')}
             >
               <div className={styles.funnelSummary}>
                 <Typography.Text type="secondary">
-                  Total: {invoiceFunnelTotal}
+                  {t('label.total', 'Total')}: {invoiceFunnelTotal}
                 </Typography.Text>
               </div>
               <div className={styles.funnel}>
@@ -626,7 +630,9 @@ const HomePage: React.FC = () => {
                               : styles.funnelIssued
                           }`}
                         />
-                        <Typography.Text>{item.status}</Typography.Text>
+                        <Typography.Text>
+                          {statusLabel(item.status)}
+                        </Typography.Text>
                       </div>
                       <Typography.Text className={styles.funnelCount}>
                         {item.count}
@@ -643,103 +649,109 @@ const HomePage: React.FC = () => {
               </div>
             </Card>
           </Col>
+          <Col xs={24} lg={16}>
+            <Card
+              className={`${styles.card} ${styles.stretchCard}`}
+              title={t('home.collectionPerformance', 'Collection performance')}
+            >
+              <div className={styles.metricRow}>
+                <div className={styles.metricTile}>
+                  <div className={styles.metricTitle}>
+                    {t('home.metric.totalInvoices', 'Total invoices')}
+                  </div>
+                  <div className={styles.metricValue}>
+                    {collectionPerformance.total}
+                  </div>
+                </div>
+                <div className={styles.metricTile}>
+                  <div className={styles.metricTitle}>
+                    {t('home.metric.onTimePaid', 'Paid ratio')}
+                  </div>
+                  <div className={styles.metricValue}>
+                    {collectionPerformance.onTimePct}%
+                  </div>
+                </div>
+                <div className={styles.metricTile}>
+                  <div className={styles.metricTitle}>
+                    {t('home.metric.overdueRatio', 'Overdue ratio')}
+                  </div>
+                  <div className={styles.metricValue}>
+                    {collectionPerformance.overduePct}%
+                  </div>
+                </div>
+                <div className={styles.metricTile}>
+                  <div className={styles.metricTitle}>
+                    {t('home.metric.returnedRatio', 'Returned ratio')}
+                  </div>
+                  <div className={styles.metricValue}>
+                    {collectionPerformance.returnedPct}%
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </Col>
         </Row>
 
         <Row gutter={[16, 16]}>
-          <Col xs={24} lg={12}>
+          <Col xs={24} lg={14}>
             <Card
               className={styles.card}
-              title="Cashflow snapshot"
-              extra={
-                <Typography.Text type="secondary">
-                  Overdue: {money.format(cashflow.totalOverdue)}
-                </Typography.Text>
-              }
+              title={t(
+                'home.cashInForecast',
+                'Cash-in forecast (next 30 days)',
+              )}
             >
               <Table
                 className={styles.table}
                 size="small"
                 pagination={false}
-                dataSource={cashflow.buckets.map((b) => ({
-                  key: b.label,
-                  bucket: b.label,
-                  count: b.count,
-                  amount: money.format(b.amount),
-                }))}
+                loading={loadingInvoices}
+                dataSource={cashInForecast.map((w) => ({ ...w, key: w.label }))}
                 columns={[
-                  { title: 'Bucket', dataIndex: 'bucket' },
-                  { title: 'Count', dataIndex: 'count' },
-                  { title: 'Amount', dataIndex: 'amount', align: 'right' },
+                  { title: t('table.period', 'Period'), dataIndex: 'label' },
+                  {
+                    title: t('table.invoices', 'Invoices'),
+                    dataIndex: 'count',
+                  },
+                  {
+                    title: t('table.expectedCashIn', 'Expected cash-in'),
+                    dataIndex: 'amount',
+                    align: 'right',
+                    render: (val: number) => money.format(val),
+                  },
                 ]}
               />
             </Card>
           </Col>
-          <Col xs={24} lg={12}>
+          <Col xs={24} lg={10}>
             <Card
               className={styles.card}
-              title="Recurring calendar (next 30 days)"
-              extra={
-                <Button
-                  size="small"
-                  onClick={() => history.push('/billing/recurring-plans')}
-                >
-                  View plans
-                </Button>
-              }
+              title={t('home.topRisks', 'Top risks')}
             >
-              {loadingPlans ? (
-                <Typography.Text type="secondary">
-                  Loading plans...
-                </Typography.Text>
-              ) : upcomingRuns.length ? (
-                <Timeline
-                  items={upcomingRuns.map((plan) => ({
-                    color: plan.status === 'ACTIVE' ? 'green' : 'gray',
-                    label: plan.nextRun,
-                    children: (
-                      <Space direction="vertical" size={0}>
-                        <Typography.Text strong>
-                          {plan.customer}
-                        </Typography.Text>
-                        <Typography.Text type="secondary">
-                          {plan.plan} • {plan.amount}
-                        </Typography.Text>
-                      </Space>
-                    ),
-                  }))}
-                />
-              ) : (
-                <Typography.Text type="secondary">
-                  No runs scheduled in the next 30 days
-                </Typography.Text>
-              )}
-            </Card>
-          </Col>
-        </Row>
-
-        <Row gutter={[16, 16]}>
-          <Col xs={24} lg={12}>
-            <Card className={styles.card} title="Top customers">
               <Table
                 className={styles.table}
                 size="small"
                 pagination={false}
-                dataSource={topCustomers}
+                loading={loadingInvoices}
+                dataSource={topRisks}
                 columns={[
-                  { title: 'Customer', dataIndex: 'customer' },
                   {
-                    title: 'Revenue',
-                    dataIndex: 'revenue',
+                    title: t('table.customer', 'Customer'),
+                    dataIndex: 'customer',
+                  },
+                  {
+                    title: t('table.overdueAmount', 'Overdue amount'),
+                    dataIndex: 'overdueAmount',
                     align: 'right',
                     render: (val: number) => money.format(val),
                   },
                   {
-                    title: 'Overdue',
-                    dataIndex: 'overdueCount',
+                    title: t('table.open', 'Open'),
+                    dataIndex: 'open',
                     align: 'center',
                   },
                   {
-                    title: 'Risk',
+                    title: t('table.risk', 'Risk'),
                     dataIndex: 'risk',
                     render: (val: string) => (
                       <Tag
@@ -751,7 +763,7 @@ const HomePage: React.FC = () => {
                             : 'green'
                         }
                       >
-                        {val}
+                        {riskLabel(val)}
                       </Tag>
                     ),
                   },
@@ -759,8 +771,43 @@ const HomePage: React.FC = () => {
               />
             </Card>
           </Col>
-          <Col xs={24} lg={12}>
-            <Card className={styles.card} title="Exceptions and alerts">
+        </Row>
+
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={14}>
+            <Card
+              className={styles.card}
+              title={t('home.recentActivity', 'Recent activity')}
+            >
+              {recentActivity.length ? (
+                <List
+                  dataSource={recentActivity}
+                  renderItem={(item) => (
+                    <List.Item>
+                      <Space direction="vertical" size={0}>
+                        <Typography.Text strong>{item.title}</Typography.Text>
+                        <Typography.Text type="secondary">
+                          {item.detail}
+                        </Typography.Text>
+                      </Space>
+                      <Typography.Text type="secondary">
+                        {item.whenText}
+                      </Typography.Text>
+                    </List.Item>
+                  )}
+                />
+              ) : (
+                <Typography.Text type="secondary">
+                  {t('empty.activity', 'No recent activity')}
+                </Typography.Text>
+              )}
+            </Card>
+          </Col>
+          <Col xs={24} lg={10}>
+            <Card
+              className={styles.card}
+              title={t('section.exceptionsAlerts', 'Exceptions and alerts')}
+            >
               {alerts.length ? (
                 <List
                   dataSource={alerts}
@@ -781,64 +828,16 @@ const HomePage: React.FC = () => {
                             : 'blue'
                         }
                       >
-                        {item.tone.toUpperCase()}
+                        {t(`tone.${item.tone}`, item.tone.toUpperCase())}
                       </Tag>
                     </List.Item>
                   )}
                 />
               ) : (
                 <Typography.Text type="secondary">
-                  No alerts right now
+                  {t('empty.alerts', 'No alerts right now')}
                 </Typography.Text>
               )}
-            </Card>
-          </Col>
-        </Row>
-
-        <Row gutter={[16, 16]}>
-          <Col xs={24}>
-            <Card
-              className={styles.card}
-              title="Open invoices"
-              extra={
-                <Button
-                  size="small"
-                  onClick={() => history.push('/billing/invoices')}
-                >
-                  View invoices
-                </Button>
-              }
-            >
-              <Table
-                className={styles.table}
-                size="small"
-                pagination={false}
-                dataSource={openInvoices}
-                loading={loadingInvoices}
-                columns={[
-                  { title: 'Invoice', dataIndex: 'invoice' },
-                  { title: 'Customer', dataIndex: 'customer' },
-                  { title: 'Due', dataIndex: 'dueDate' },
-                  { title: 'Amount', dataIndex: 'amount', align: 'right' },
-                  {
-                    title: 'Status',
-                    dataIndex: 'status',
-                    render: (val: string) => (
-                      <Tag
-                        color={
-                          val === 'OVERDUE'
-                            ? 'red'
-                            : val === 'SENT'
-                            ? 'blue'
-                            : 'gold'
-                        }
-                      >
-                        {val}
-                      </Tag>
-                    ),
-                  },
-                ]}
-              />
             </Card>
           </Col>
         </Row>

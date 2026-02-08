@@ -5,6 +5,7 @@ import {
   ProFormSelect,
   ProFormTextArea,
 } from '@ant-design/pro-components';
+import { useIntl } from '@umijs/max';
 import React from 'react';
 
 type Props = {
@@ -20,9 +21,13 @@ const OrderForm: React.FC<Props> = ({
   initialValues,
   onFinish,
 }) => {
+  const intl = useIntl();
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
+
   return (
     <ModalForm
-      title="New Order"
+      title={t('action.newOrder', 'New Order')}
       open={open}
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
@@ -35,8 +40,13 @@ const OrderForm: React.FC<Props> = ({
     >
       <ProFormSelect
         name="customerId"
-        label="Customer"
-        rules={[{ required: true, message: 'Please select customer' }]}
+        label={t('label.customer', 'Customer')}
+        rules={[
+          {
+            required: true,
+            message: t('message.selectCustomer', 'Please select customer'),
+          },
+        ]}
         showSearch
         debounceTime={300}
         request={async ({ keyWords }) => {
@@ -55,7 +65,11 @@ const OrderForm: React.FC<Props> = ({
           }
         }}
       />
-      <ProFormTextArea name="notes" label="Notes" colProps={{ span: 24 }} />
+      <ProFormTextArea
+        name="notes"
+        label={t('label.notes', 'Notes')}
+        colProps={{ span: 24 }}
+      />
     </ModalForm>
   );
 };

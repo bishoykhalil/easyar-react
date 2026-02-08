@@ -5,6 +5,7 @@ import {
   ProFormSelect,
   ProFormText,
 } from '@ant-design/pro-components';
+import { useIntl } from '@umijs/max';
 import { message, Spin } from 'antd';
 import React, { useEffect, useState } from 'react';
 
@@ -19,6 +20,10 @@ const CreateUserModal: React.FC<Props> = ({
   onOpenChange,
   onCreated,
 }) => {
+  const intl = useIntl();
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
+
   const [roles, setRoles] = useState<Role[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
 
@@ -28,7 +33,10 @@ const CreateUserModal: React.FC<Props> = ({
       const res = await listRoles();
       setRoles(res.data || []);
     } catch (err: any) {
-      message.error(err?.data?.message || 'Failed to load roles');
+      message.error(
+        err?.data?.message ||
+          t('message.failedToLoadRoles', 'Failed to load roles'),
+      );
     } finally {
       setLoadingRoles(false);
     }
@@ -42,7 +50,7 @@ const CreateUserModal: React.FC<Props> = ({
 
   return (
     <ModalForm<RegistrationRequest>
-      title="Create User"
+      title={t('modal.userCreate', 'Create User')}
       open={open}
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
@@ -50,43 +58,61 @@ const CreateUserModal: React.FC<Props> = ({
       onFinish={async (values) => {
         try {
           await createUser(values);
-          message.success('User created');
+          message.success(t('message.userCreated', 'User created'));
           onCreated();
           return true;
         } catch (err: any) {
-          message.error(err?.data?.message || 'Create failed');
+          message.error(
+            err?.data?.message || t('message.createFailed', 'Create failed'),
+          );
           return false;
         }
       }}
     >
       <ProFormText
         name="name"
-        label="Name"
-        rules={[{ required: true, message: 'Please enter name' }]}
-        placeholder="Full name"
+        label={t('label.name', 'Name')}
+        rules={[
+          {
+            required: true,
+            message: t('message.nameRequired', 'Please enter name'),
+          },
+        ]}
+        placeholder={t('placeholder.fullName', 'Full name')}
       />
       <ProFormText
         name="email"
-        label="Email"
+        label={t('label.email', 'Email')}
         rules={[
-          { required: true, message: 'Please enter email' },
-          { type: 'email', message: 'Invalid email' },
+          {
+            required: true,
+            message: t('message.emailRequired', 'Please enter email'),
+          },
+          {
+            type: 'email',
+            message: t('message.emailInvalid', 'Invalid email'),
+          },
         ]}
-        placeholder="user@example.com"
+        placeholder={t('placeholder.email', 'user@example.com')}
       />
       <ProFormText.Password
         name="password"
-        label="Password"
-        rules={[{ required: true, message: 'Please enter password' }]}
-        placeholder="Password"
+        label={t('label.password', 'Password')}
+        rules={[
+          {
+            required: true,
+            message: t('message.passwordRequired', 'Please enter password'),
+          },
+        ]}
+        placeholder={t('placeholder.password', 'Password')}
       />
       <ProFormSelect
         name="roles"
-        label="Roles"
+        label={t('label.roles', 'Roles')}
         mode="multiple"
         fieldProps={{ loading: loadingRoles }}
         options={roles.map((r) => ({ label: r.name, value: r.name }))}
-        placeholder="Select roles"
+        placeholder={t('placeholder.roles', 'Select roles')}
       />
       {loadingRoles && (
         <div style={{ textAlign: 'center', marginTop: 8 }}>

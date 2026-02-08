@@ -12,82 +12,93 @@ import {
   ProTable,
   type ProColumns,
 } from '@ant-design/pro-components';
+import { useIntl } from '@umijs/max';
 import { Badge, Button, message, Popconfirm, Space, Tooltip } from 'antd';
 import React, { useRef, useState } from 'react';
 import PlanForm from './components/PlanForm';
 
 const RecurringPlansPage: React.FC = () => {
   const actionRef = useRef<any>();
+  const intl = useIntl();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<RecurringPlanDTO | undefined>(
     undefined,
   );
 
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
+
+  const planFrequencyLabel = (frequency?: string) => {
+    if (!frequency) return '-';
+    return t(`frequency.${String(frequency).toLowerCase()}`, frequency);
+  };
+
   const columns: ProColumns<RecurringPlanDTO>[] = [
     {
-      title: 'Customer',
+      title: t('table.customer', 'Customer'),
       dataIndex: 'customerName',
     },
     {
-      title: 'Frequency',
+      title: t('table.frequency', 'Frequency'),
       dataIndex: 'frequency',
+      render: (_, r) => planFrequencyLabel(r.frequency),
     },
     {
-      title: 'Status',
+      title: t('table.status', 'Status'),
       dataIndex: 'status',
       render: (_, r) => {
         if (r.status === 'EXPIRED')
-          return <Badge status="error" text="Expired" />;
+          return <Badge status="error" text={t('status.expired', 'Expired')} />;
         if (r.status === 'PAUSED' || r.active === false)
-          return <Badge status="default" text="Paused" />;
-        return <Badge status="success" text="Active" />;
+          return <Badge status="default" text={t('status.paused', 'Paused')} />;
+        return <Badge status="success" text={t('status.active', 'Active')} />;
       },
       valueType: 'select',
       valueEnum: {
-        ACTIVE: { text: 'Active' },
-        PAUSED: { text: 'Paused' },
-        EXPIRED: { text: 'Expired' },
+        ACTIVE: { text: t('status.active', 'Active') },
+        PAUSED: { text: t('status.paused', 'Paused') },
+        EXPIRED: { text: t('status.expired', 'Expired') },
       },
     },
     {
-      title: 'Next Run',
+      title: t('table.nextRun', 'Next Run'),
       dataIndex: 'nextRunDate',
       valueType: 'date',
     },
     {
-      title: 'Last Run',
+      title: t('table.lastRun', 'Last Run'),
       dataIndex: 'lastRunDate',
       valueType: 'date',
       render: (_, r) => r.lastRunDate || '-',
     },
     {
-      title: 'Count',
+      title: t('table.count', 'Count'),
       dataIndex: 'generatedCount',
       render: (_, r) => `${r.generatedCount}/${r.maxOccurrences}`,
     },
     {
-      title: 'Remaining',
+      title: t('table.remaining', 'Remaining'),
       dataIndex: 'remainingOccurrences',
       render: (_, r) =>
         r.remainingOccurrences ?? r.maxOccurrences - r.generatedCount,
     },
     {
-      title: 'Active',
+      title: t('table.active', 'Active'),
       dataIndex: 'active',
       render: (_, r) =>
         r.active ? (
-          <Badge status="success" text="Active" />
+          <Badge status="success" text={t('status.active', 'Active')} />
         ) : (
-          <Badge status="default" text="Inactive" />
+          <Badge status="default" text={t('status.inactive', 'Inactive')} />
         ),
       valueType: 'select',
       valueEnum: {
-        true: { text: 'Active' },
-        false: { text: 'Inactive' },
+        true: { text: t('status.active', 'Active') },
+        false: { text: t('status.inactive', 'Inactive') },
       },
     },
     {
-      title: 'Actions',
+      title: t('table.actions', 'Actions'),
       valueType: 'option',
       render: (_, record) => {
         const exhausted =
@@ -106,17 +117,22 @@ const RecurringPlansPage: React.FC = () => {
               try {
                 const res = await generateNow(record.id);
                 const invId = res?.data;
-                message.success('Invoice generated');
+                message.success(
+                  t('message.invoiceGenerated', 'Invoice generated'),
+                );
                 if (invId) {
                   window.open(`/billing/invoices?keyword=${invId}`, '_blank');
                 }
                 actionRef.current?.reload();
               } catch (err: any) {
-                message.error(err?.data?.message || 'Generate failed');
+                message.error(
+                  err?.data?.message ||
+                    t('error.generateFailed', 'Generate failed'),
+                );
               }
             }}
           >
-            Generate Now
+            {t('action.generateNow', 'Generate Now')}
           </Button>
         );
 
@@ -130,7 +146,7 @@ const RecurringPlansPage: React.FC = () => {
                 setFormOpen(true);
               }}
             >
-              Edit
+              {t('action.edit', 'Edit')}
             </Button>
             <Button
               size="small"
@@ -138,14 +154,23 @@ const RecurringPlansPage: React.FC = () => {
               onClick={async () => {
                 try {
                   await setPlanActive(record.id, !record.active);
-                  message.success(record.active ? 'Deactivated' : 'Activated');
+                  message.success(
+                    record.active
+                      ? t('message.deactivated', 'Deactivated')
+                      : t('message.activated', 'Activated'),
+                  );
                   actionRef.current?.reload();
                 } catch (err: any) {
-                  message.error(err?.data?.message || 'Toggle failed');
+                  message.error(
+                    err?.data?.message ||
+                      t('error.toggleFailed', 'Toggle failed'),
+                  );
                 }
               }}
             >
-              {record.active ? 'Deactivate' : 'Activate'}
+              {record.active
+                ? t('action.deactivate', 'Deactivate')
+                : t('action.activate', 'Activate')}
             </Button>
             {canGenerate ? (
               generateBtn
@@ -153,30 +178,39 @@ const RecurringPlansPage: React.FC = () => {
               <Tooltip
                 title={
                   expired
-                    ? 'Plan expired (max occurrences reached)'
+                    ? t(
+                        'tooltip.planExpired',
+                        'Plan expired (max occurrences reached)',
+                      )
                     : paused
-                    ? 'Plan is paused'
+                    ? t('tooltip.planPaused', 'Plan is paused')
                     : exhausted
-                    ? 'Max occurrences reached'
-                    : 'Plan is inactive'
+                    ? t(
+                        'tooltip.maxOccurrencesReached',
+                        'Max occurrences reached',
+                      )
+                    : t('tooltip.planInactive', 'Plan is inactive')
                 }
               >
                 <span>{generateBtn}</span>
               </Tooltip>
             )}
             <Popconfirm
-              title="Delete plan?"
+              title={t('confirm.deletePlan', 'Delete plan?')}
               onConfirm={async () => {
                 try {
                   await deletePlan(record.id);
-                  message.success('Deleted');
+                  message.success(t('message.deleted', 'Deleted'));
                   actionRef.current?.reload();
                 } catch (err: any) {
-                  message.error(err?.data?.message || 'Delete failed');
+                  message.error(
+                    err?.data?.message ||
+                      t('error.deleteFailed', 'Delete failed'),
+                  );
                 }
               }}
             >
-              <a style={{ color: 'red' }}>Delete</a>
+              <a style={{ color: 'red' }}>{t('action.delete', 'Delete')}</a>
             </Popconfirm>
           </Space>
         );
@@ -185,7 +219,7 @@ const RecurringPlansPage: React.FC = () => {
   ];
 
   return (
-    <PageContainer>
+    <PageContainer title={t('page.recurringPlans', 'Recurring Plans')}>
       <ProTable<RecurringPlanDTO>
         rowKey="id"
         actionRef={actionRef}
@@ -199,12 +233,15 @@ const RecurringPlansPage: React.FC = () => {
               success: true,
             };
           } catch (err: any) {
-            message.error(err?.data?.message || 'Failed to load plans');
+            message.error(
+              err?.data?.message ||
+                t('error.failedToLoadPlans', 'Failed to load plans'),
+            );
             return { data: [], success: false };
           }
         }}
         toolbar={{
-          title: 'Recurring Plans',
+          title: t('page.recurringPlans', 'Recurring Plans'),
           actions: [
             <Button
               key="new"
@@ -214,7 +251,7 @@ const RecurringPlansPage: React.FC = () => {
                 setFormOpen(true);
               }}
             >
-              New Plan
+              {t('action.newPlan', 'New Plan')}
             </Button>,
           ],
         }}
@@ -234,11 +271,17 @@ const RecurringPlansPage: React.FC = () => {
             } else {
               await createPlan(values);
             }
-            message.success(editing?.id ? 'Updated' : 'Created');
+            message.success(
+              editing?.id
+                ? t('message.updated', 'Updated')
+                : t('message.created', 'Created'),
+            );
             actionRef.current?.reload();
             return true;
           } catch (err: any) {
-            message.error(err?.data?.message || 'Save failed');
+            message.error(
+              err?.data?.message || t('error.saveFailed', 'Save failed'),
+            );
             return false;
           }
         }}

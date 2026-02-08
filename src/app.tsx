@@ -1,6 +1,6 @@
 import type { RequestConfig, RuntimeConfig } from '@umijs/max';
 import { history } from '@umijs/max';
-import { Button } from 'antd';
+import HeaderActions from './components/HeaderActions';
 
 const loginPath = '/user/login';
 const TOKEN_KEY = 'easyar_token';
@@ -12,6 +12,7 @@ export type InitialState = {
   token?: string;
   roles?: string[];
   permissions?: string[];
+  themeMode?: string;
   currentUser?: {
     id?: number;
     name?: string;
@@ -22,6 +23,7 @@ export type InitialState = {
 
 export async function getInitialState(): Promise<InitialState> {
   const token = localStorage.getItem(TOKEN_KEY) || undefined;
+  const savedTheme = localStorage.getItem(THEME_KEY) || 'SYSTEM';
   const roles = (() => {
     const raw = localStorage.getItem(ROLES_KEY);
     try {
@@ -44,28 +46,60 @@ export async function getInitialState(): Promise<InitialState> {
       token: undefined,
       roles: undefined,
       permissions: undefined,
+      themeMode: savedTheme,
       currentUser: undefined,
     };
   }
 
   try {
-    const res = await fetch('http://localhost:8086/api/users/me', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    if (!res.ok) {
-      return { token, roles, permissions, currentUser: undefined };
+    const [meRes, settingsRes] = await Promise.all([
+      fetch('http://localhost:8086/api/users/me', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }),
+      fetch('http://localhost:8086/api/settings', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }),
+    ]);
+
+    let resolvedTheme = savedTheme;
+    if (settingsRes.ok) {
+      const settingsJson = await settingsRes.json();
+      resolvedTheme = settingsJson?.data?.themeMode || savedTheme;
+      if (resolvedTheme) {
+        localStorage.setItem(THEME_KEY, resolvedTheme);
+      }
     }
-    const json = await res.json();
+
+    if (!meRes.ok) {
+      return {
+        token,
+        roles,
+        permissions,
+        themeMode: resolvedTheme,
+        currentUser: undefined,
+      };
+    }
+
+    const meJson = await meRes.json();
     return {
       token,
       roles,
-      permissions: json?.data?.permissions ?? permissions,
-      currentUser: json?.data,
+      permissions: meJson?.data?.permissions ?? permissions,
+      themeMode: resolvedTheme,
+      currentUser: meJson?.data,
     };
   } catch {
-    return { token, roles, permissions, currentUser: undefined };
+    return {
+      token,
+      roles,
+      permissions,
+      themeMode: savedTheme,
+      currentUser: undefined,
+    };
   }
 }
 
@@ -74,11 +108,11 @@ export const layout: RuntimeConfig['layout'] = ({ initialState }) => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ROLES_KEY);
     localStorage.removeItem(PERMS_KEY);
-    localStorage.removeItem(THEME_KEY);
     history.push(loginPath);
   };
 
-  const savedTheme = localStorage.getItem(THEME_KEY) || 'SYSTEM';
+  const savedTheme =
+    initialState?.themeMode || localStorage.getItem(THEME_KEY) || 'SYSTEM';
   const navTheme = savedTheme === 'DARK' ? 'realDark' : 'light';
 
   return {
@@ -86,13 +120,9 @@ export const layout: RuntimeConfig['layout'] = ({ initialState }) => {
     logo: 'https://img.alicdn.com/tfs/TB1YHEpwUT1gK0jSZFhXXaAtVXa-28-27.svg',
     navTheme,
     menu: {
-      locale: false,
+      locale: true,
     },
-    rightContentRender: () => (
-      <Button type="link" onClick={logout}>
-        Logout
-      </Button>
-    ),
+    rightContentRender: () => <HeaderActions onLogout={logout} />,
     onPageChange: () => {
       const { location } = history;
       const authed = Boolean(initialState?.token);

@@ -1,4 +1,5 @@
 import { login } from '@/services/auth';
+import { getSettings } from '@/services/settings';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { LoginForm, ProFormText } from '@ant-design/pro-components';
 import { history, useModel } from '@umijs/max';
@@ -8,6 +9,7 @@ import React, { useState } from 'react';
 const TOKEN_KEY = 'easyar_token';
 const ROLES_KEY = 'easyar_roles';
 const PERMS_KEY = 'easyar_perms';
+const THEME_KEY = 'easyar_theme';
 
 const Login: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
@@ -29,6 +31,15 @@ const Login: React.FC = () => {
       localStorage.setItem(TOKEN_KEY, token);
       localStorage.setItem(ROLES_KEY, JSON.stringify(roles));
       localStorage.setItem(PERMS_KEY, JSON.stringify(permissions));
+      try {
+        const settingsRes = await getSettings();
+        const themeMode = settingsRes?.data?.themeMode;
+        if (themeMode) {
+          localStorage.setItem(THEME_KEY, themeMode);
+        }
+      } catch {
+        // Keep login successful even if settings fetch fails.
+      }
 
       await setInitialState((s: any) => ({
         ...s,

@@ -5,6 +5,7 @@ import {
   ProFormText,
   ProFormTextArea,
 } from '@ant-design/pro-components';
+import { useIntl } from '@umijs/max';
 import React from 'react';
 
 type Props = {
@@ -20,9 +21,17 @@ const CustomerForm: React.FC<Props> = ({
   initialValues,
   onFinish,
 }) => {
+  const intl = useIntl();
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
+
   return (
     <ModalForm<CustomerDTO>
-      title={initialValues?.id ? 'Edit Customer' : 'New Customer'}
+      title={
+        initialValues?.id
+          ? t('modal.customerEdit', 'Edit Customer')
+          : t('modal.customerNew', 'New Customer')
+      }
       open={open}
       onOpenChange={onOpenChange}
       initialValues={{
@@ -40,28 +49,46 @@ const CustomerForm: React.FC<Props> = ({
     >
       <ProFormText
         name="name"
-        label="Name"
-        rules={[{ required: true, message: 'Please enter customer name' }]}
+        label={t('label.name', 'Name')}
+        rules={[
+          {
+            required: true,
+            message: t(
+              'message.customerNameRequired',
+              'Please enter customer name',
+            ),
+          },
+        ]}
       />
-      <ProFormText name="email" label="Email" />
-      <ProFormText name="phone" label="Phone" />
-      <ProFormText name="street" label="Street" />
-      <ProFormText name="city" label="City" />
-      <ProFormText name="postalCode" label="Postal Code" />
+      <ProFormText name="email" label={t('label.email', 'Email')} />
+      <ProFormText name="phone" label={t('label.phone', 'Phone')} />
+      <ProFormText name="street" label={t('label.street', 'Street')} />
+      <ProFormText name="city" label={t('label.city', 'City')} />
+      <ProFormText
+        name="postalCode"
+        label={t('label.postalCode', 'Postal Code')}
+      />
       <ProFormText
         name="countryCode"
-        label="Country Code"
-        placeholder="e.g. DE"
+        label={t('label.countryCode', 'Country Code')}
+        placeholder={t('placeholder.countryCode', 'e.g. DE')}
       />
       <ProFormDigit
         name="paymentTermsDays"
-        label="Payment Terms (days)"
+        label={t('label.paymentTermsDays', 'Payment Terms (days)')}
         min={0}
         max={365}
       />
-      <ProFormText name="vatId" label="VAT ID" />
-      <ProFormText name="taxNumber" label="Tax Number" />
-      <ProFormTextArea name="notes" label="Notes" colProps={{ span: 24 }} />
+      <ProFormText name="vatId" label={t('label.vatId', 'VAT ID')} />
+      <ProFormText
+        name="taxNumber"
+        label={t('label.taxNumber', 'Tax Number')}
+      />
+      <ProFormTextArea
+        name="notes"
+        label={t('label.notes', 'Notes')}
+        colProps={{ span: 24 }}
+      />
     </ModalForm>
   );
 };

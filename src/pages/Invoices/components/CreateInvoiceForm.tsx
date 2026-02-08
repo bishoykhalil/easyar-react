@@ -1,5 +1,6 @@
 import { listOrdersPaged, type OrderResponseDTO } from '@/services/orders';
 import { ModalForm, ProFormSelect } from '@ant-design/pro-components';
+import { useIntl } from '@umijs/max';
 import React from 'react';
 
 type Props = {
@@ -13,9 +14,13 @@ const CreateInvoiceForm: React.FC<Props> = ({
   onOpenChange,
   onFinish,
 }) => {
+  const intl = useIntl();
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
+
   return (
     <ModalForm<{ orderId: number }>
-      title="Create Invoice from Order"
+      title={t('modal.createInvoiceFromOrder', 'Create Invoice from Order')}
       open={open}
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
@@ -24,8 +29,13 @@ const CreateInvoiceForm: React.FC<Props> = ({
     >
       <ProFormSelect
         name="orderId"
-        label="Order"
-        rules={[{ required: true, message: 'Please select order' }]}
+        label={t('label.order', 'Order')}
+        rules={[
+          {
+            required: true,
+            message: t('message.selectOrder', 'Please select order'),
+          },
+        ]}
         showSearch
         debounceTime={300}
         request={async ({ keyWords }) => {

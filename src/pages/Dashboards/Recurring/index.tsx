@@ -1,10 +1,16 @@
 import { listPlans, type RecurringPlanDTO } from '@/services/recurring';
 import { PageContainer } from '@ant-design/pro-components';
+import { getLocale, useIntl } from '@umijs/max';
 import { Card, Col, Row, Space, Table, Typography } from 'antd';
 import React, { useEffect, useMemo, useState } from 'react';
 import styles from '../styles.less';
 
 const RecurringOpsDashboard: React.FC = () => {
+  const intl = useIntl();
+  const money = new Intl.NumberFormat(getLocale(), {
+    style: 'currency',
+    currency: 'EUR',
+  });
   const [plans, setPlans] = useState<RecurringPlanDTO[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -31,6 +37,9 @@ const RecurringOpsDashboard: React.FC = () => {
     }
     return new Date(value);
   };
+
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
 
   const calcAmount = (plan: RecurringPlanDTO) =>
     plan.items.reduce((sum, item) => {
@@ -118,16 +127,34 @@ const RecurringOpsDashboard: React.FC = () => {
   }, [plans]);
 
   return (
-    <PageContainer title="Recurring Ops">
+    <PageContainer title={t('page.dashboards.recurring', 'Recurring Ops')}>
       <div className={styles.container}>
         <Row gutter={[16, 16]}>
           {[
-            { title: 'Runs due today', value: metrics.dueToday },
-            { title: 'Runs due this week', value: metrics.dueWeek },
-            { title: 'Active plans', value: metrics.active },
-            { title: 'Paused plans', value: metrics.paused },
-            { title: 'Expiring soon', value: metrics.expiring },
-            { title: 'Missing items', value: metrics.missingItems },
+            {
+              title: t('dash.recurring.kpi.dueToday', 'Runs due today'),
+              value: metrics.dueToday,
+            },
+            {
+              title: t('dash.recurring.kpi.dueWeek', 'Runs due this week'),
+              value: metrics.dueWeek,
+            },
+            {
+              title: t('dash.recurring.kpi.activePlans', 'Active plans'),
+              value: metrics.active,
+            },
+            {
+              title: t('dash.recurring.kpi.pausedPlans', 'Paused plans'),
+              value: metrics.paused,
+            },
+            {
+              title: t('dash.recurring.kpi.expiringSoon', 'Expiring soon'),
+              value: metrics.expiring,
+            },
+            {
+              title: t('dash.recurring.kpi.missingItems', 'Missing items'),
+              value: metrics.missingItems,
+            },
           ].map((item) => (
             <Col xs={24} sm={12} lg={4} key={item.title}>
               <Card className={styles.card} bordered>
@@ -146,7 +173,13 @@ const RecurringOpsDashboard: React.FC = () => {
 
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={14}>
-            <Card className={styles.card} title="Runs due in the next 7 days">
+            <Card
+              className={styles.card}
+              title={t(
+                'dash.recurring.runsNext7Days',
+                'Runs due in the next 7 days',
+              )}
+            >
               <Table
                 className={styles.table}
                 size="small"
@@ -154,27 +187,40 @@ const RecurringOpsDashboard: React.FC = () => {
                 loading={loading}
                 dataSource={runsThisWeek}
                 columns={[
-                  { title: 'Plan', dataIndex: 'plan' },
-                  { title: 'Customer', dataIndex: 'customer' },
-                  { title: 'Next Run', dataIndex: 'nextRun' },
-                  { title: 'Remaining', dataIndex: 'remaining' },
+                  { title: t('table.plan', 'Plan'), dataIndex: 'plan' },
                   {
-                    title: 'Amount',
+                    title: t('table.customer', 'Customer'),
+                    dataIndex: 'customer',
+                  },
+                  {
+                    title: t('table.nextRun', 'Next Run'),
+                    dataIndex: 'nextRun',
+                  },
+                  {
+                    title: t('table.remaining', 'Remaining'),
+                    dataIndex: 'remaining',
+                  },
+                  {
+                    title: t('table.amount', 'Amount'),
                     dataIndex: 'amount',
                     align: 'right',
-                    render: (val: number) =>
-                      new Intl.NumberFormat('en', {
-                        style: 'currency',
-                        currency: 'EUR',
-                      }).format(val),
+                    render: (val: number) => money.format(val),
                   },
                 ]}
-                locale={{ emptyText: 'No runs due in the next 7 days' }}
+                locale={{
+                  emptyText: t(
+                    'dash.recurring.emptyNext7Days',
+                    'No runs due in the next 7 days',
+                  ),
+                }}
               />
             </Card>
           </Col>
           <Col xs={24} lg={10}>
-            <Card className={styles.card} title="Renewal pipeline">
+            <Card
+              className={styles.card}
+              title={t('dash.recurring.renewalPipeline', 'Renewal pipeline')}
+            >
               <Table
                 className={styles.table}
                 size="small"
@@ -182,12 +228,26 @@ const RecurringOpsDashboard: React.FC = () => {
                 loading={loading}
                 dataSource={expiringPlans}
                 columns={[
-                  { title: 'Plan', dataIndex: 'plan' },
-                  { title: 'Customer', dataIndex: 'customer' },
-                  { title: 'Remaining', dataIndex: 'remaining' },
-                  { title: 'Next Run', dataIndex: 'nextRun' },
+                  { title: t('table.plan', 'Plan'), dataIndex: 'plan' },
+                  {
+                    title: t('table.customer', 'Customer'),
+                    dataIndex: 'customer',
+                  },
+                  {
+                    title: t('table.remaining', 'Remaining'),
+                    dataIndex: 'remaining',
+                  },
+                  {
+                    title: t('table.nextRun', 'Next Run'),
+                    dataIndex: 'nextRun',
+                  },
                 ]}
-                locale={{ emptyText: 'No plans nearing renewal' }}
+                locale={{
+                  emptyText: t(
+                    'dash.recurring.emptyRenewal',
+                    'No plans nearing renewal',
+                  ),
+                }}
               />
             </Card>
           </Col>

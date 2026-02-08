@@ -28,35 +28,21 @@ export default defineConfig({
     },
     {
       path: '/',
-      redirect: '/core/home',
+      redirect: '/home',
     },
     {
-      name: 'Core',
       path: '/core',
-      routes: [
-        {
-          path: '/core',
-          redirect: '/core/home',
-        },
-        {
-          name: 'Home',
-          path: '/core/home',
-          component: './Home',
-          access: 'isAuthenticated',
-        },
-        {
-          name: 'Access Demo',
-          path: '/core/access',
-          component: './Access',
-          access: 'isAuthenticated',
-        },
-        {
-          name: 'CRUD Example',
-          path: '/core/table',
-          component: './Table',
-          access: 'isAuthenticated',
-        },
-      ],
+      redirect: '/home',
+    },
+    {
+      path: '/core/home',
+      redirect: '/home',
+    },
+    {
+      name: 'Home',
+      path: '/home',
+      component: './Home',
+      access: 'isAuthenticated',
     },
     {
       name: 'Dashboards',
@@ -156,7 +142,7 @@ export default defineConfig({
     },
     {
       path: '/*',
-      redirect: '/core/home',
+      redirect: '/home',
     },
   ],
   npmClient: 'npm',

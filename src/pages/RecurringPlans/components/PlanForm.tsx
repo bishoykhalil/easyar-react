@@ -14,6 +14,7 @@ import {
   ProFormText,
   ProFormTextArea,
 } from '@ant-design/pro-components';
+import { useIntl } from '@umijs/max';
 import { Button, Divider, message, Table, Typography } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -31,6 +32,9 @@ const PlanForm: React.FC<Props> = ({
   onFinish,
 }) => {
   const formRef = useRef<any>();
+  const intl = useIntl();
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
   const [priceItemCache, setPriceItemCache] = useState<
     Record<number, PriceListItemDTO>
   >({});
@@ -78,7 +82,12 @@ const PlanForm: React.FC<Props> = ({
 
   const handleAddItem = async () => {
     if (itemsReadOnly) {
-      message.warning('Items are read-only for existing plans');
+      message.warning(
+        t(
+          'message.itemsReadOnlyForExistingPlans',
+          'Items are read-only for existing plans',
+        ),
+      );
       return;
     }
     try {
@@ -111,7 +120,12 @@ const PlanForm: React.FC<Props> = ({
       const discountPercent = Number(discountPercentRaw ?? 0);
       if (!priceListItemId || !Number.isFinite(qty) || qty <= 0) return;
       if (!name) {
-        message.error('Select a valid price list item');
+        message.error(
+          t(
+            'message.selectValidPriceListItem',
+            'Select a valid price list item',
+          ),
+        );
         return;
       }
       setItems((prev) => {
@@ -125,7 +139,7 @@ const PlanForm: React.FC<Props> = ({
             ...current,
             quantity: (current.quantity || 0) + qty,
           };
-          message.success('Quantity updated');
+          message.success(t('message.quantityUpdated', 'Quantity updated'));
           return updated;
         }
         return [
@@ -163,7 +177,11 @@ const PlanForm: React.FC<Props> = ({
 
   return (
     <ModalForm
-      title={initialValues?.id ? 'Edit Plan' : 'New Plan'}
+      title={
+        initialValues?.id
+          ? t('modal.planEdit', 'Edit Plan')
+          : t('modal.planNew', 'New Plan')
+      }
       open={open}
       onOpenChange={onOpenChange}
       initialValues={initialValues}
@@ -171,8 +189,10 @@ const PlanForm: React.FC<Props> = ({
       layout="vertical"
       submitter={{
         searchConfig: {
-          submitText: initialValues?.id ? 'Save' : 'Create',
-          resetText: 'Cancel',
+          submitText: initialValues?.id
+            ? t('action.save', 'Save')
+            : t('action.create', 'Create'),
+          resetText: t('action.cancel', 'Cancel'),
         },
         resetButtonProps: {
           onClick: () => onOpenChange(false),
@@ -181,7 +201,9 @@ const PlanForm: React.FC<Props> = ({
       formRef={formRef}
       onFinish={async (values) => {
         if (items.length === 0) {
-          message.error('Add at least one item');
+          message.error(
+            t('message.addAtLeastOneItem', 'Add at least one item'),
+          );
           return false;
         }
         const payload = hasUnlinkedItems ? { ...values } : { ...values, items };
@@ -200,8 +222,13 @@ const PlanForm: React.FC<Props> = ({
       <ProFormGroup>
         <ProFormSelect
           name="customerId"
-          label="Customer"
-          rules={[{ required: true, message: 'Please select customer' }]}
+          label={t('label.customer', 'Customer')}
+          rules={[
+            {
+              required: true,
+              message: t('message.selectCustomer', 'Please select customer'),
+            },
+          ]}
           showSearch
           debounceTime={300}
           request={async ({ keyWords }) => {
@@ -223,17 +250,17 @@ const PlanForm: React.FC<Props> = ({
         />
         <ProFormText
           name="currency"
-          label="Currency"
+          label={t('label.currency', 'Currency')}
           placeholder="EUR"
           colProps={{ span: 6 }}
           fieldProps={{ disabled: true }}
         />
         <ProFormDigit
           name="paymentTermsDays"
-          label="Payment Terms (days)"
+          label={t('label.paymentTermsDays', 'Payment Terms (days)')}
           min={0}
           max={365}
-          placeholder="e.g. 14"
+          placeholder={t('placeholder.paymentTerms', 'e.g. 14')}
           colProps={{ span: 6 }}
           fieldProps={{ disabled: true }}
         />
@@ -242,55 +269,83 @@ const PlanForm: React.FC<Props> = ({
       <ProFormGroup>
         <ProFormSelect
           name="frequency"
-          label="Frequency"
+          label={t('label.frequency', 'Frequency')}
           valueEnum={{
-            DAILY: 'Daily',
-            WEEKLY: 'Weekly',
-            MONTHLY: 'Monthly',
-            YEARLY: 'Yearly',
+            DAILY: t('frequency.daily', 'Daily'),
+            WEEKLY: t('frequency.weekly', 'Weekly'),
+            MONTHLY: t('frequency.monthly', 'Monthly'),
+            YEARLY: t('frequency.yearly', 'Yearly'),
           }}
           initialValue="MONTHLY"
           colProps={{ span: 6 }}
         />
         <ProFormDatePicker
           name="startDate"
-          label="Start Date"
-          rules={[{ required: true, message: 'Select start date' }]}
+          label={t('label.startDate', 'Start Date')}
+          rules={[
+            {
+              required: true,
+              message: t('message.selectStartDate', 'Select start date'),
+            },
+          ]}
           colProps={{ span: 6 }}
         />
         <ProFormDatePicker
           name="nextRunDate"
-          label="Next Run Date"
-          tooltip="Defaults to start date if left empty"
+          label={t('label.nextRunDate', 'Next Run Date')}
+          tooltip={t(
+            'tooltip.nextRunDefaultsToStart',
+            'Defaults to start date if left empty',
+          )}
           colProps={{ span: 6 }}
         />
         <ProFormDigit
           name="maxOccurrences"
-          label="Max Occurrences"
-          rules={[{ required: true, message: 'Enter max occurrences' }]}
+          label={t('label.maxOccurrences', 'Max Occurrences')}
+          rules={[
+            {
+              required: true,
+              message: t(
+                'message.enterMaxOccurrences',
+                'Enter max occurrences',
+              ),
+            },
+          ]}
           min={1}
-          tooltip="Plan stops after this many invoices"
+          tooltip={t(
+            'tooltip.planStopsAfter',
+            'Plan stops after this many invoices',
+          )}
           colProps={{ span: 6 }}
         />
       </ProFormGroup>
 
       <ProFormTextArea
         name="notes"
-        label="Notes"
+        label={t('label.notes', 'Notes')}
         colProps={{ span: 24 }}
         fieldProps={{ rows: 3 }}
       />
 
       <Divider style={{ marginTop: 12, marginBottom: 12 }} />
       <Typography.Title level={5} style={{ marginBottom: 8 }}>
-        Items
+        {t('section.items', 'Items')}
       </Typography.Title>
       <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
         {itemsReadOnly
           ? hasUnlinkedItems
-            ? 'Items were created from an invoice and are read-only here.'
-            : 'Items are read-only for existing plans.'
-          : 'Select a price list item, set quantity, and click Add. Prices/VAT will follow the selected item.'}
+            ? t(
+                'plan.itemsHint.readOnlyFromInvoice',
+                'Items were created from an invoice and are read-only here.',
+              )
+            : t(
+                'plan.itemsHint.readOnlyExisting',
+                'Items are read-only for existing plans.',
+              )
+          : t(
+              'plan.itemsHint.selectAndAdd',
+              'Select a price list item, set quantity, and click Add. Prices/VAT will follow the selected item.',
+            )}
       </Typography.Paragraph>
 
       <div
@@ -313,7 +368,7 @@ const PlanForm: React.FC<Props> = ({
           >
             <ProFormSelect
               name="tempItemId"
-              label="Price List Item"
+              label={t('label.priceListItem', 'Price List Item')}
               showSearch
               debounceTime={300}
               disabled={itemsReadOnly}
@@ -372,14 +427,14 @@ const PlanForm: React.FC<Props> = ({
             <ProFormText name="tempItemVatRate" hidden />
             <ProFormDigit
               name="tempQty"
-              label="Quantity"
+              label={t('label.quantity', 'Quantity')}
               min={1}
               fieldProps={{ step: 1, precision: 0 }}
               disabled={itemsReadOnly}
             />
             <ProFormDigit
               name="tempDiscount"
-              label="Discount %"
+              label={t('label.discountPercent', 'Discount %')}
               min={0}
               max={100}
               fieldProps={{ step: 1, precision: 0 }}
@@ -390,7 +445,7 @@ const PlanForm: React.FC<Props> = ({
               onClick={handleAddItem}
               disabled={itemsReadOnly}
             >
-              Add
+              {t('action.add', 'Add')}
             </Button>
           </div>
         )}
@@ -401,28 +456,28 @@ const PlanForm: React.FC<Props> = ({
           scroll={{ x: 'max-content' }}
           dataSource={items.map((it, idx) => ({ key: idx, ...it }))}
           columns={[
-            { title: 'Item', dataIndex: 'name', width: 140 },
+            { title: t('table.name', 'Name'), dataIndex: 'name', width: 140 },
             {
-              title: 'Description',
+              title: t('table.description', 'Description'),
               dataIndex: 'description',
               ellipsis: true,
             },
-            { title: 'Unit', dataIndex: 'unit', width: 90 },
+            { title: t('table.unit', 'Unit'), dataIndex: 'unit', width: 90 },
             {
-              title: 'Quantity',
+              title: t('table.quantity', 'Qty'),
               dataIndex: 'quantity',
               width: 90,
               render: (val) => val ?? '-',
             },
             {
-              title: 'Unit Net',
+              title: t('table.unitNet', 'Unit Net'),
               dataIndex: 'unitPriceNet',
               width: 110,
               render: (val) =>
                 typeof val === 'number' ? `EUR ${val.toFixed(2)}` : '-',
             },
             {
-              title: 'VAT',
+              title: t('table.vatRate', 'VAT Rate'),
               dataIndex: 'vatRate',
               width: 90,
               render: (val) =>
@@ -431,7 +486,7 @@ const PlanForm: React.FC<Props> = ({
                   : '-',
             },
             {
-              title: 'Discount %',
+              title: t('table.discount', 'Discount %'),
               dataIndex: 'discountPercent',
               width: 110,
               render: (val) =>
@@ -440,7 +495,7 @@ const PlanForm: React.FC<Props> = ({
                   : '0%',
             },
             {
-              title: 'Net',
+              title: t('table.net', 'Net'),
               width: 110,
               render: (_val, record) => {
                 if (
@@ -456,7 +511,7 @@ const PlanForm: React.FC<Props> = ({
               },
             },
             {
-              title: 'Gross',
+              title: t('table.gross', 'Gross'),
               width: 110,
               render: (_val, record) => {
                 if (
@@ -482,7 +537,7 @@ const PlanForm: React.FC<Props> = ({
                         style={{ color: 'red' }}
                         onClick={() => handleRemoveItem(index)}
                       >
-                        Remove
+                        {t('action.remove', 'Remove')}
                       </a>
                     ),
                   },

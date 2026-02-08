@@ -29,7 +29,7 @@ import {
   type ProColumns,
   type ProFormInstance,
 } from '@ant-design/pro-components';
-import { useLocation } from '@umijs/max';
+import { getLocale, useIntl, useLocation } from '@umijs/max';
 import {
   Badge,
   Button,
@@ -55,7 +55,7 @@ import {
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import CreateInvoiceForm from './components/CreateInvoiceForm';
 
 const statusColors: Record<
@@ -69,10 +69,6 @@ const statusColors: Record<
   OVERDUE: 'error',
 };
 
-const money = new Intl.NumberFormat('en', {
-  style: 'currency',
-  currency: 'EUR',
-});
 const formatPercent = (val?: number) => {
   const pct = Math.round(((val ?? 0) * 100 + Number.EPSILON) * 100) / 100;
   const text = pct.toFixed(2).replace(/\.00$/, '');
@@ -85,6 +81,15 @@ const formatDateTime = (val?: string) =>
 
 const InvoicesPage: React.FC = () => {
   const actionRef = useRef<any>();
+  const intl = useIntl();
+  const money = useMemo(
+    () =>
+      new Intl.NumberFormat(getLocale(), {
+        style: 'currency',
+        currency: 'EUR',
+      }),
+    [],
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [selected, setSelected] = useState<InvoiceResponseDTO | undefined>(
     undefined,
@@ -114,16 +119,35 @@ const InvoicesPage: React.FC = () => {
   const formRef = useRef<ProFormInstance>();
   const location = useLocation();
 
+  const t = (
+    id: string,
+    defaultMessage: string,
+    values?: Record<string, any>,
+  ) => intl.formatMessage({ id, defaultMessage }, values);
+
+  const statusLabel = (status: string) =>
+    t(`status.${String(status).toLowerCase()}`, status);
+
   const openPlanModal = async (record: InvoiceResponseDTO) => {
     try {
       if (record.status === 'RETURNED' || record.status === 'OVERDUE') {
-        message.error('Cannot create plan from returned/overdue invoice');
+        message.error(
+          t(
+            'error.cannotCreatePlanFromReturnedOrOverdue',
+            'Cannot create plan from returned/overdue invoice',
+          ),
+        );
         return;
       }
       setCreatingPlan(true);
       const res = await getInvoice(record.id);
       if (!res.data?.items || res.data.items.length === 0) {
-        message.error('Invoice has no items to create a plan');
+        message.error(
+          t(
+            'error.invoiceHasNoItemsToCreatePlan',
+            'Invoice has no items to create a plan',
+          ),
+        );
         setCreatingPlan(false);
         return;
       }
@@ -140,7 +164,12 @@ const InvoicesPage: React.FC = () => {
     } catch (err: any) {
       const backendMsg = err?.data?.message || err?.response?.data?.message;
       const msg =
-        backendMsg || err?.message || 'Failed to create recurring plan';
+        backendMsg ||
+        err?.message ||
+        t(
+          'error.failedToCreateRecurringPlan',
+          'Failed to create recurring plan',
+        );
       message.error(msg);
     } finally {
       setCreatingPlan(false);
@@ -168,7 +197,13 @@ const InvoicesPage: React.FC = () => {
       setEditModalOpen(true);
     } catch (err: any) {
       const backendMsg = err?.data?.message || err?.response?.data?.message;
-      message.error(backendMsg || 'Failed to load invoice for edit');
+      message.error(
+        backendMsg ||
+          t(
+            'error.failedToLoadInvoiceForEdit',
+            'Failed to load invoice for edit',
+          ),
+      );
     } finally {
       setSavingEdit(false);
     }
@@ -177,7 +212,9 @@ const InvoicesPage: React.FC = () => {
   const handleCreateReminder = async (record: InvoiceResponseDTO) => {
     try {
       const res = await createReminderInvoice(record.id);
-      message.success('Reminder invoice created');
+      message.success(
+        t('message.reminderInvoiceCreated', 'Reminder invoice created'),
+      );
       actionRef.current?.reload();
       if (res.data) {
         setSelected(res.data);
@@ -185,7 +222,13 @@ const InvoicesPage: React.FC = () => {
       }
     } catch (err: any) {
       const backendMsg = err?.data?.message || err?.response?.data?.message;
-      message.error(backendMsg || 'Failed to create reminder invoice');
+      message.error(
+        backendMsg ||
+          t(
+            'error.failedToCreateReminderInvoice',
+            'Failed to create reminder invoice',
+          ),
+      );
     }
   };
 
@@ -196,93 +239,111 @@ const InvoicesPage: React.FC = () => {
       window.open(url);
       setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
     } catch (err: any) {
-      message.error(err?.data?.message || 'Failed to download PDF');
+      message.error(
+        err?.data?.message ||
+          t('error.failedToDownloadPdf', 'Failed to download PDF'),
+      );
     }
   };
 
   const columns: ProColumns<InvoiceResponseDTO>[] = [
     {
-      title: 'Invoice #',
+      title: t('table.invoiceNumber', 'Invoice #'),
       dataIndex: 'invoiceNumber',
       render: (_, r) => r.invoiceNumber || `#${r.id}`,
     },
     {
-      title: 'Customer',
+      title: t('table.customer', 'Customer'),
       dataIndex: 'customerName',
     },
     {
-      title: 'Status',
+      title: t('table.createdBy', 'Created by'),
+      dataIndex: 'createdByName',
+      hideInSearch: true,
+      renderText: (val) => val || '-',
+    },
+    {
+      title: t('table.status', 'Status'),
       dataIndex: 'status',
       render: (_, r) => (
-        <Badge status={statusColors[r.status]} text={r.status} />
+        <Badge status={statusColors[r.status]} text={statusLabel(r.status)} />
       ),
       valueType: 'select',
       valueEnum: {
-        ISSUED: { text: 'ISSUED' },
-        SENT: { text: 'SENT' },
-        PAID: { text: 'PAID' },
-        RETURNED: { text: 'RETURNED' },
-        OVERDUE: { text: 'OVERDUE' },
+        ISSUED: { text: statusLabel('ISSUED') },
+        SENT: { text: statusLabel('SENT') },
+        PAID: { text: statusLabel('PAID') },
+        RETURNED: { text: statusLabel('RETURNED') },
+        OVERDUE: { text: statusLabel('OVERDUE') },
       },
     },
     {
-      title: 'Net',
+      title: t('table.net', 'Net'),
       dataIndex: 'totalNet',
       renderText: (val) => (val !== undefined ? money.format(val) : ''),
       hideInSearch: true,
     },
     {
-      title: 'Gross',
+      title: t('table.gross', 'Gross'),
       dataIndex: 'totalGross',
       renderText: (val) => (val !== undefined ? money.format(val) : ''),
       hideInSearch: true,
     },
     {
-      title: 'Recurring',
+      title: t('table.recurring', 'Recurring'),
       dataIndex: 'recurring',
       render: (_, r) =>
-        r.recurring ? <Tag color="blue">Recurring</Tag> : <Tag>One-off</Tag>,
-      valueType: 'select',
-      valueEnum: {
-        true: { text: 'Recurring' },
-        false: { text: 'One-off' },
-      },
-    },
-    {
-      title: 'Overdue',
-      dataIndex: 'overdue',
-      render: (_, r) =>
-        r.overdue ? (
-          <Badge status="error" text={`Yes (${r.daysOverdue}d)`} />
+        r.recurring ? (
+          <Tag color="blue">{t('label.recurring', 'Recurring')}</Tag>
         ) : (
-          <Badge status="success" text="No" />
+          <Tag>{t('label.oneOff', 'One-off')}</Tag>
         ),
       valueType: 'select',
       valueEnum: {
-        true: { text: 'Overdue' },
-        false: { text: 'Not Overdue' },
+        true: { text: t('label.recurring', 'Recurring') },
+        false: { text: t('label.oneOff', 'One-off') },
       },
     },
     {
-      title: 'Issued At',
+      title: t('table.overdue', 'Overdue'),
+      dataIndex: 'overdue',
+      render: (_, r) =>
+        r.overdue ? (
+          <Badge
+            status="error"
+            text={t('invoice.overdueShort', 'Yes ({days}d)', {
+              days: r.daysOverdue,
+            })}
+          />
+        ) : (
+          <Badge status="success" text={t('label.no', 'No')} />
+        ),
+      valueType: 'select',
+      valueEnum: {
+        true: { text: t('label.overdue', 'Overdue') },
+        false: { text: t('label.notOverdue', 'Not Overdue') },
+      },
+    },
+    {
+      title: t('table.issuedAt', 'Issued At'),
       dataIndex: 'issuedAt',
       valueType: 'dateTime',
       hideInSearch: true,
     },
     {
-      title: 'Paid At',
+      title: t('table.paidAt', 'Paid At'),
       dataIndex: 'paidAt',
       valueType: 'dateTime',
       hideInSearch: true,
     },
     {
-      title: 'Due Date',
+      title: t('table.dueDate', 'Due Date'),
       dataIndex: 'dueDate',
       valueType: 'date',
       hideInSearch: true,
     },
     {
-      title: 'Actions',
+      title: t('table.actions', 'Actions'),
       valueType: 'option',
       render: (_, record) => (
         <Space>
@@ -293,13 +354,16 @@ const InvoicesPage: React.FC = () => {
                 setSelected(res.data);
                 setDrawerOpen(true);
               } catch (err: any) {
-                message.error(err?.data?.message || 'Failed to load invoice');
+                message.error(
+                  err?.data?.message ||
+                    t('error.failedToLoadInvoice', 'Failed to load invoice'),
+                );
               }
             }}
           >
-            View
+            {t('action.view', 'View')}
           </a>
-          <a onClick={() => openPdf(record.id)}>PDF</a>
+          <a onClick={() => openPdf(record.id)}>{t('action.pdf', 'PDF')}</a>
           {record.recurring ? null : (
             <Button
               size="small"
@@ -307,7 +371,7 @@ const InvoicesPage: React.FC = () => {
               loading={creatingPlan}
               onClick={() => openPlanModal(record)}
             >
-              Create Plan
+              {t('action.createPlan', 'Create Plan')}
             </Button>
           )}
           {record.status === 'OVERDUE' && (
@@ -316,23 +380,26 @@ const InvoicesPage: React.FC = () => {
               type="link"
               onClick={() => handleCreateReminder(record)}
             >
-              Reminder Invoice
+              {t('action.reminderInvoice', 'Reminder invoice')}
             </Button>
           )}
           {record.status === 'ISSUED' && (
             <Popconfirm
-              title="Delete invoice?"
+              title={t('confirm.deleteInvoice', 'Delete invoice?')}
               onConfirm={async () => {
                 try {
                   await deleteInvoice(record.id);
-                  message.success('Deleted');
+                  message.success(t('message.deleted', 'Deleted'));
                   actionRef.current?.reload();
                 } catch (err: any) {
-                  message.error(err?.data?.message || 'Delete failed');
+                  message.error(
+                    err?.data?.message ||
+                      t('error.deleteFailed', 'Delete failed'),
+                  );
                 }
               }}
             >
-              <a style={{ color: 'red' }}>Delete</a>
+              <a style={{ color: 'red' }}>{t('action.delete', 'Delete')}</a>
             </Popconfirm>
           )}
         </Space>
@@ -486,11 +553,19 @@ const InvoicesPage: React.FC = () => {
       label: string;
       time?: string;
     }> = [
-      { key: 'ISSUED', label: 'Issued', time: invoice.issuedAt },
-      { key: 'SENT', label: 'Sent', time: invoice.sentAt },
-      { key: 'PAID', label: 'Paid', time: invoice.paidAt },
-      { key: 'RETURNED', label: 'Returned', time: invoice.returnedAt },
-      { key: 'OVERDUE', label: 'Overdue', time: invoice.overdueAt },
+      { key: 'ISSUED', label: statusLabel('ISSUED'), time: invoice.issuedAt },
+      { key: 'SENT', label: statusLabel('SENT'), time: invoice.sentAt },
+      { key: 'PAID', label: statusLabel('PAID'), time: invoice.paidAt },
+      {
+        key: 'RETURNED',
+        label: statusLabel('RETURNED'),
+        time: invoice.returnedAt,
+      },
+      {
+        key: 'OVERDUE',
+        label: statusLabel('OVERDUE'),
+        time: invoice.overdueAt,
+      },
     ];
 
     return steps.map((step) => {
@@ -505,7 +580,7 @@ const InvoicesPage: React.FC = () => {
       }
       return {
         title: step.label,
-        description: step.time ? formatDateTime(step.time) : '—',
+        description: step.time ? formatDateTime(step.time) : t('label.na', '—'),
         status,
       };
     });
@@ -596,18 +671,18 @@ const InvoicesPage: React.FC = () => {
 
   const editColumns = [
     {
-      title: 'Name',
+      title: t('table.name', 'Name'),
       dataIndex: 'name',
       render: (val: any) => <span>{val}</span>,
     },
     {
-      title: 'Unit',
+      title: t('table.unit', 'Unit'),
       dataIndex: 'unit',
       width: 120,
       render: (val: any) => <span>{val}</span>,
     },
     {
-      title: 'Qty',
+      title: t('table.quantity', 'Qty'),
       dataIndex: 'quantity',
       width: 90,
       render: (_: any, __: any, index: number) => (
@@ -628,19 +703,19 @@ const InvoicesPage: React.FC = () => {
       ),
     },
     {
-      title: 'Unit Net',
+      title: t('table.unitNet', 'Unit Net'),
       dataIndex: 'unitPriceNet',
       width: 120,
       render: (val: any) => money.format(val || 0),
     },
     {
-      title: 'VAT',
+      title: t('table.vatRate', 'VAT Rate'),
       dataIndex: 'vatRate',
       width: 90,
       render: (val: any) => `${(val ?? 0) * 100}%`,
     },
     {
-      title: 'Discount %',
+      title: t('table.discount', 'Discount %'),
       dataIndex: 'discountPercent',
       width: 120,
       render: (_: any, __: any, index: number) => (
@@ -660,21 +735,21 @@ const InvoicesPage: React.FC = () => {
       ),
     },
     {
-      title: 'Net',
+      title: t('table.net', 'Net'),
       dataIndex: 'net',
       width: 120,
       render: (_: any, __: any, index: number) =>
         money.format(calcPreview(editRows[index]).net || 0),
     },
     {
-      title: 'Gross',
+      title: t('table.gross', 'Gross'),
       dataIndex: 'gross',
       width: 120,
       render: (_: any, __: any, index: number) =>
         money.format(calcPreview(editRows[index]).gross || 0),
     },
     {
-      title: 'Actions',
+      title: t('table.actions', 'Actions'),
       width: 90,
       render: (_: any, __: any, index: number) => (
         <Button
@@ -717,12 +792,15 @@ const InvoicesPage: React.FC = () => {
               total: data?.totalElements || 0,
             };
           } catch (err: any) {
-            message.error(err?.data?.message || 'Failed to load invoices');
+            message.error(
+              err?.data?.message ||
+                t('error.failedToLoadInvoices', 'Failed to load invoices'),
+            );
             return { data: [], success: false };
           }
         }}
         toolbar={{
-          title: 'Invoices',
+          title: t('page.invoices', 'Invoices'),
           actions: [
             <Button
               key="new"
@@ -731,7 +809,7 @@ const InvoicesPage: React.FC = () => {
                 setFormOpen(true);
               }}
             >
-              New from Order
+              {t('action.newFromOrder', 'New from Order')}
             </Button>,
           ],
         }}
@@ -743,12 +821,14 @@ const InvoicesPage: React.FC = () => {
         onFinish={async (values) => {
           try {
             await createFromOrder(values.orderId);
-            message.success('Invoice created');
+            message.success(t('message.invoiceCreated', 'Invoice created'));
             setFormOpen(false);
             actionRef.current?.reload();
             return true;
           } catch (err: any) {
-            message.error(err?.data?.message || 'Create failed');
+            message.error(
+              err?.data?.message || t('error.createFailed', 'Create failed'),
+            );
             return false;
           }
         }}
@@ -761,12 +841,14 @@ const InvoicesPage: React.FC = () => {
           setDrawerOpen(false);
           setSelected(undefined);
         }}
-        title={`Invoice ${selected?.invoiceNumber || selected?.id || ''}`}
+        title={t('drawer.invoiceTitle', 'Invoice {number}', {
+          number: selected?.invoiceNumber || selected?.id || '',
+        })}
       >
         {selected && (
           <>
             <Typography.Title level={5} style={{ marginBottom: 12 }}>
-              Status Timeline
+              {t('section.statusTimeline', 'Status timeline')}
             </Typography.Title>
             <Steps
               size="small"
@@ -779,56 +861,73 @@ const InvoicesPage: React.FC = () => {
             <Row gutter={16}>
               <Col xs={24} md={16}>
                 <Descriptions column={2} size="small" bordered>
-                  <Descriptions.Item label="Customer">
+                  <Descriptions.Item label={t('label.customer', 'Customer')}>
                     {selected.customerName}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Status">
+                  <Descriptions.Item label={t('label.status', 'Status')}>
                     <Badge
                       status={statusColors[selected.status]}
-                      text={selected.status}
+                      text={statusLabel(selected.status)}
                     />
                   </Descriptions.Item>
-                  <Descriptions.Item label="Currency">
+                  <Descriptions.Item label={t('label.currency', 'Currency')}>
                     {selected.currency}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Due Date">
+                  <Descriptions.Item label={t('label.createdBy', 'Created by')}>
+                    {selected.createdByName || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item
+                    label={t('label.createdByUserId', 'Created by User ID')}
+                  >
+                    {selected.createdByUserId ?? '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={t('label.dueDate', 'Due Date')}>
                     {formatDate(selected.dueDate)}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Total Net">
+                  <Descriptions.Item label={t('label.totalNet', 'Total Net')}>
                     {money.format(selected.totalNet || 0)}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Total Gross">
+                  <Descriptions.Item
+                    label={t('label.totalGross', 'Total Gross')}
+                  >
                     {money.format(selected.totalGross || 0)}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Issued At">
+                  <Descriptions.Item label={t('label.issuedAt', 'Issued At')}>
                     {formatDateTime(selected.issuedAt)}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Sent At">
+                  <Descriptions.Item label={t('label.sentAt', 'Sent At')}>
                     {formatDateTime(selected.sentAt)}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Paid At">
+                  <Descriptions.Item label={t('label.paidAt', 'Paid At')}>
                     {formatDateTime(selected.paidAt)}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Returned At">
+                  <Descriptions.Item
+                    label={t('label.returnedAt', 'Returned At')}
+                  >
                     {formatDateTime(selected.returnedAt)}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Overdue At">
+                  <Descriptions.Item label={t('label.overdueAt', 'Overdue At')}>
                     {formatDateTime(selected.overdueAt)}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Overdue" span={2}>
+                  <Descriptions.Item
+                    label={t('label.overdue', 'Overdue')}
+                    span={2}
+                  >
                     {selected.overdue ? (
                       <Tag color="error">
-                        Overdue {selected.daysOverdue} days
+                        {t('invoice.overdueDays', 'Overdue {days} days', {
+                          days: selected.daysOverdue,
+                        })}
                       </Tag>
                     ) : (
-                      <Tag color="success">No</Tag>
+                      <Tag color="success">{t('label.no', 'No')}</Tag>
                     )}
                   </Descriptions.Item>
                 </Descriptions>
 
                 <Divider />
                 <Typography.Title level={5} style={{ marginBottom: 12 }}>
-                  Items
+                  {t('section.items', 'Items')}
                 </Typography.Title>
                 <Table
                   size="small"
@@ -837,49 +936,49 @@ const InvoicesPage: React.FC = () => {
                   dataSource={selected.items || []}
                   columns={[
                     {
-                      title: 'Name',
+                      title: t('table.name', 'Name'),
                       dataIndex: 'name',
                       render: (val) => (
                         <Typography.Text strong>{val}</Typography.Text>
                       ),
                     },
                     {
-                      title: 'Unit',
+                      title: t('table.unit', 'Unit'),
                       dataIndex: 'unit',
                       width: 80,
                       render: (val) => val || '—',
                     },
                     {
-                      title: 'Qty',
+                      title: t('table.quantity', 'Qty'),
                       dataIndex: 'quantity',
                       width: 80,
                     },
                     {
-                      title: 'Unit Net',
+                      title: t('table.unitNet', 'Unit Net'),
                       dataIndex: 'unitPriceNet',
                       width: 120,
                       render: (val) => money.format(val || 0),
                     },
                     {
-                      title: 'VAT',
+                      title: t('table.vatRate', 'VAT Rate'),
                       dataIndex: 'vatRate',
                       width: 80,
                       render: (val) => formatPercent(val),
                     },
                     {
-                      title: 'Discount %',
+                      title: t('table.discount', 'Discount %'),
                       dataIndex: 'discountPercent',
                       width: 120,
                       render: (val) => `${val ?? 0}%`,
                     },
                     {
-                      title: 'Net',
+                      title: t('table.net', 'Net'),
                       dataIndex: 'lineNet',
                       width: 120,
                       render: (val) => money.format(val || 0),
                     },
                     {
-                      title: 'Gross',
+                      title: t('table.gross', 'Gross'),
                       dataIndex: 'lineGross',
                       width: 120,
                       render: (val) => money.format(val || 0),
@@ -889,7 +988,7 @@ const InvoicesPage: React.FC = () => {
                 />
                 <div style={{ marginTop: 8 }}>
                   <Button type="link" onClick={() => openPdf(selected.id)}>
-                    Download PDF
+                    {t('action.downloadPdf', 'Download PDF')}
                   </Button>
                 </div>
               </Col>
@@ -899,7 +998,10 @@ const InvoicesPage: React.FC = () => {
                   style={{ width: '100%' }}
                   size="middle"
                 >
-                  <Card title="Quick Actions" size="small">
+                  <Card
+                    title={t('section.quickActions', 'Quick actions')}
+                    size="small"
+                  >
                     <Space
                       direction="vertical"
                       style={{ width: '100%' }}
@@ -907,57 +1009,81 @@ const InvoicesPage: React.FC = () => {
                     >
                       <Space size={8} wrap>
                         {renderIconActionButton(
-                          'Mark Sent',
+                          t('action.markSent', 'Mark Sent'),
                           <SendOutlined />,
                           () => handleStatusChange(selected.id, 'SENT'),
                           selected.status === 'ISSUED' ||
                             selected.status === 'RETURNED',
-                          'Only ISSUED/RETURNED invoices can be sent',
+                          t(
+                            'tooltip.invoiceOnlyIssuedReturnedCanBeSent',
+                            'Only ISSUED/RETURNED invoices can be sent',
+                          ),
                           { type: 'primary' },
                         )}
                         <Popconfirm
-                          title="Mark invoice as paid?"
-                          description="This action is final."
+                          title={t(
+                            'confirm.markInvoicePaid.title',
+                            'Mark invoice as paid?',
+                          )}
+                          description={t(
+                            'confirm.markInvoicePaid.desc',
+                            'This action is final.',
+                          )}
                           onConfirm={() =>
                             handleStatusChange(selected.id, 'PAID')
                           }
-                          okText="Mark Paid"
-                          cancelText="Cancel"
+                          okText={t('action.markPaid', 'Mark Paid')}
+                          cancelText={t('action.cancel', 'Cancel')}
                         >
                           {renderIconActionButton(
-                            'Mark Paid',
+                            t('action.markPaid', 'Mark Paid'),
                             <CheckCircleOutlined />,
                             () => {},
                             ['ISSUED', 'SENT', 'OVERDUE'].includes(
                               selected.status,
                             ),
-                            'Only ISSUED/SENT/OVERDUE invoices can be paid',
+                            t(
+                              'tooltip.invoiceOnlyIssuedSentOverdueCanBePaid',
+                              'Only ISSUED/SENT/OVERDUE invoices can be paid',
+                            ),
                           )}
                         </Popconfirm>
                         {renderIconActionButton(
-                          'Return',
+                          t('action.return', 'Return'),
                           <RollbackOutlined />,
                           () => handleStatusChange(selected.id, 'RETURNED'),
                           ['ISSUED', 'SENT'].includes(selected.status),
-                          'Only ISSUED/SENT invoices can be returned',
+                          t(
+                            'tooltip.invoiceOnlyIssuedSentCanBeReturned',
+                            'Only ISSUED/SENT invoices can be returned',
+                          ),
                           { danger: true },
                         )}
                         <Popconfirm
-                          title="Mark invoice as overdue?"
-                          description="This action is final."
+                          title={t(
+                            'confirm.markInvoiceOverdue.title',
+                            'Mark invoice as overdue?',
+                          )}
+                          description={t(
+                            'confirm.markInvoiceOverdue.desc',
+                            'This action is final.',
+                          )}
                           onConfirm={() =>
                             handleStatusChange(selected.id, 'OVERDUE')
                           }
-                          okText="Mark Overdue"
-                          cancelText="Cancel"
+                          okText={t('action.markOverdue', 'Mark Overdue')}
+                          cancelText={t('action.cancel', 'Cancel')}
                         >
                           {renderIconActionButton(
-                            'Mark Overdue',
+                            t('action.markOverdue', 'Mark Overdue'),
                             <ExclamationCircleOutlined />,
                             () => {},
                             Boolean(selected.overdue) &&
                               ['ISSUED', 'SENT'].includes(selected.status),
-                            'Only overdue ISSUED/SENT invoices can be marked overdue',
+                            t(
+                              'tooltip.invoiceOnlyOverdueIssuedSentCanBeMarkedOverdue',
+                              'Only overdue ISSUED/SENT invoices can be marked overdue',
+                            ),
                             { danger: true },
                           )}
                         </Popconfirm>
@@ -968,64 +1094,86 @@ const InvoicesPage: React.FC = () => {
                         size="small"
                       >
                         {renderActionButton(
-                          'Re-issue',
+                          t('action.reissue', 'Re-issue'),
                           () => handleStatusChange(selected.id, 'ISSUED'),
                           selected.status === 'RETURNED',
-                          'Only RETURNED invoices can be re-issued',
+                          t(
+                            'tooltip.invoiceOnlyReturnedCanBeReissued',
+                            'Only RETURNED invoices can be re-issued',
+                          ),
                         )}
                         {renderActionButton(
-                          'Edit Items',
+                          t('action.editItems', 'Edit Items'),
                           () => openEditModal(selected),
                           selected.status === 'RETURNED',
-                          'Only RETURNED invoices can be edited',
+                          t(
+                            'tooltip.invoiceOnlyReturnedCanBeEdited',
+                            'Only RETURNED invoices can be edited',
+                          ),
                         )}
                         {renderActionButton(
-                          'Create Reminder',
+                          t('action.createReminder', 'Create Reminder'),
                           () => handleCreateReminder(selected),
                           selected.status === 'OVERDUE',
-                          'Only OVERDUE invoices can create reminders',
+                          t(
+                            'tooltip.invoiceOnlyOverdueCanCreateReminders',
+                            'Only OVERDUE invoices can create reminders',
+                          ),
                         )}
                       </Space>
                     </Space>
                   </Card>
 
-                  <Card title="Financial Snapshot" size="small">
+                  <Card
+                    title={t('section.financialSnapshot', 'Financial snapshot')}
+                    size="small"
+                  >
                     <Descriptions column={1} size="small">
-                      <Descriptions.Item label="Net">
+                      <Descriptions.Item label={t('label.net', 'Net')}>
                         {money.format(selected.totalNet || 0)}
                       </Descriptions.Item>
-                      <Descriptions.Item label="VAT">
+                      <Descriptions.Item label={t('label.vat', 'VAT')}>
                         {money.format(selected.totalVat || 0)}
                       </Descriptions.Item>
-                      <Descriptions.Item label="Gross">
+                      <Descriptions.Item label={t('label.gross', 'Gross')}>
                         {money.format(selected.totalGross || 0)}
                       </Descriptions.Item>
-                      <Descriptions.Item label="Due Date">
+                      <Descriptions.Item label={t('label.dueDate', 'Due Date')}>
                         {formatDate(selected.dueDate)}
                       </Descriptions.Item>
-                      <Descriptions.Item label="Days Overdue">
-                        {selected.overdue ? selected.daysOverdue : '—'}
+                      <Descriptions.Item
+                        label={t('label.daysOverdue', 'Days Overdue')}
+                      >
+                        {selected.overdue
+                          ? String(selected.daysOverdue ?? 0)
+                          : t('label.na', '—')}
                       </Descriptions.Item>
                     </Descriptions>
                   </Card>
 
-                  <Card title="Customer" size="small" loading={customerLoading}>
+                  <Card
+                    title={t('section.customerInfo', 'Customer')}
+                    size="small"
+                    loading={customerLoading}
+                  >
                     {customerDetails ? (
                       <Space direction="vertical" size={6}>
                         <Typography.Text strong>
                           {customerDetails.name}
                         </Typography.Text>
                         <Typography.Text type="secondary">
-                          {customerDetails.email || 'No email'}
+                          {customerDetails.email ||
+                            t('label.noEmail', 'No email')}
                         </Typography.Text>
                         <Typography.Text type="secondary">
-                          {customerDetails.phone || 'No phone'}
+                          {customerDetails.phone ||
+                            t('label.noPhone', 'No phone')}
                         </Typography.Text>
                         <Typography.Text>
-                          Payment Terms:{' '}
+                          {t('label.paymentTerms', 'Payment Terms')}:{' '}
                           {customerDetails.paymentTermsDays ??
                             selected.paymentTermsDays ??
-                            '—'}
+                            t('label.na', '—')}
                         </Typography.Text>
                         <Typography.Link
                           onClick={() =>
@@ -1035,17 +1183,23 @@ const InvoicesPage: React.FC = () => {
                             )
                           }
                         >
-                          View Customer
+                          {t('action.viewCustomer', 'View customer')}
                         </Typography.Link>
                       </Space>
                     ) : (
                       <Typography.Text type="secondary">
-                        Customer details unavailable
+                        {t(
+                          'error.customerDetailsUnavailable',
+                          'Customer details unavailable',
+                        )}
                       </Typography.Text>
                     )}
                   </Card>
 
-                  <Card title="Internal Flags" size="small">
+                  <Card
+                    title={t('section.internalFlags', 'Internal flags')}
+                    size="small"
+                  >
                     {(() => {
                       const flags: string[] = [];
                       if (
@@ -1053,15 +1207,25 @@ const InvoicesPage: React.FC = () => {
                         selected.returnedAt
                       ) {
                         flags.push(
-                          `Returned at ${formatDateTime(selected.returnedAt)}`,
+                          t('invoice.flag.returnedAt', 'Returned at {time}', {
+                            time: formatDateTime(selected.returnedAt),
+                          }),
                         );
                       }
                       if (selected.status === 'OVERDUE' || selected.overdue) {
-                        flags.push(`Overdue ${selected.daysOverdue || 0} days`);
+                        flags.push(
+                          t('invoice.flag.overdueDays', 'Overdue {days} days', {
+                            days: selected.daysOverdue || 0,
+                          }),
+                        );
                       }
                       if (selected.reminderForInvoiceId) {
                         flags.push(
-                          `Reminder for invoice #${selected.reminderForInvoiceId}`,
+                          t(
+                            'invoice.flag.reminderForInvoice',
+                            'Reminder for invoice #{id}',
+                            { id: selected.reminderForInvoiceId },
+                          ),
                         );
                       }
                       return flags.length ? (
@@ -1072,7 +1236,7 @@ const InvoicesPage: React.FC = () => {
                         </Space>
                       ) : (
                         <Typography.Text type="secondary">
-                          No internal flags
+                          {t('empty.internalFlags', 'No internal flags')}
                         </Typography.Text>
                       );
                     })()}
@@ -1085,16 +1249,16 @@ const InvoicesPage: React.FC = () => {
       </Drawer>
 
       <Modal
-        title={`Edit Invoice Items ${
-          editingInvoice?.invoiceNumber || editingInvoice?.id || ''
-        }`}
+        title={t('modal.editInvoiceItems', 'Edit Invoice Items {number}', {
+          number: editingInvoice?.invoiceNumber || editingInvoice?.id || '',
+        })}
         open={editModalOpen}
         onCancel={() => {
           setEditModalOpen(false);
           setEditingInvoice(undefined);
           setEditRows([]);
         }}
-        okText="Save Changes"
+        okText={t('action.saveChanges', 'Save Changes')}
         okButtonProps={{ loading: savingEdit }}
         onOk={handleEditSave}
         width={960}
@@ -1104,7 +1268,10 @@ const InvoicesPage: React.FC = () => {
           <Space size={12} wrap>
             <Select<number>
               style={{ minWidth: 260 }}
-              placeholder="Select price list item"
+              placeholder={t(
+                'placeholder.selectPriceListItem',
+                'Select price list item',
+              )}
               showSearch
               filterOption={false}
               loading={priceLoading}
@@ -1127,19 +1294,19 @@ const InvoicesPage: React.FC = () => {
               precision={0}
               value={addQty}
               onChange={(val) => setAddQty(Number(val))}
-              placeholder="Qty"
-              addonBefore="Qty"
+              placeholder={t('label.quantity', 'Quantity')}
+              addonBefore={t('label.qty', 'Qty')}
             />
             <InputNumber
               min={0}
               max={100}
               value={addDiscount}
               onChange={(val) => setAddDiscount(Number(val))}
-              placeholder="Discount %"
-              addonBefore="Discount"
+              placeholder={t('label.discountPercent', 'Discount %')}
+              addonBefore={t('label.discount', 'Discount')}
             />
             <Button type="primary" onClick={handleAddItem}>
-              Add Service
+              {t('action.addService', 'Add service')}
             </Button>
           </Space>
           <Table
@@ -1154,13 +1321,15 @@ const InvoicesPage: React.FC = () => {
       </Modal>
 
       <Modal
-        title={`Create Recurring Plan from Invoice ${
-          planInvoice?.invoiceNumber || planInvoice?.id || ''
-        }`}
+        title={t(
+          'modal.createPlanFromInvoice',
+          'Create Recurring Plan from Invoice {number}',
+          { number: planInvoice?.invoiceNumber || planInvoice?.id || '' },
+        )}
         open={planModalOpen}
         onCancel={() => setPlanModalOpen(false)}
         destroyOnClose
-        okText="Create Plan"
+        okText={t('action.createPlan', 'Create Plan')}
         okButtonProps={{ loading: creatingPlan }}
         onOk={async () => {
           try {
@@ -1177,7 +1346,9 @@ const InvoicesPage: React.FC = () => {
               frequency: values.frequency,
             };
             const res = await createPlanFromInvoice(planInvoice.id, payload);
-            message.success('Recurring plan created');
+            message.success(
+              t('message.recurringPlanCreated', 'Recurring plan created'),
+            );
             setPlanModalOpen(false);
             if (res.data?.id) {
               window.open(

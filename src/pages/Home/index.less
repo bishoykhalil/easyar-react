@@ -4,6 +4,64 @@
   gap: 16px;
 }
 
+.actionGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.actionTile {
+  border: 1px solid #303030;
+  background: #18181b;
+  border-radius: 10px;
+  padding: 12px;
+  text-align: left;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.actionTile:hover {
+  border-color: #3b82f6;
+  background: #1e1e24;
+}
+
+.actionCount {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.actionLabel {
+  margin-top: 6px;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.metricRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metricTile {
+  border: 1px solid #303030;
+  background: #18181b;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.metricTitle {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.metricValue {
+  margin-top: 6px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
 .card {
   background: #1f1f1f;
   border-color: #303030;
@@ -51,73 +109,56 @@
   flex: 1;
 }
 
-.chart {
-  width: 100%;
-  min-height: 72px;
-  height: 100%;
-  flex: 1;
-}
-
-.chartGrid {
-  stroke: #2a2a2a;
-  stroke-width: 0.5;
-}
-
-.chartDotNet {
-  fill: #2563eb;
-}
-
-.chartDotGross {
-  fill: #22c55e;
-}
-
-.chartTooltip {
-  position: absolute;
-  top: 8px;
-  transform: translateX(-50%);
-  background: #111827;
-  border: 1px solid #303030;
-  border-radius: 8px;
-  padding: 8px 10px;
-  min-width: 140px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 30%);
-  pointer-events: none;
-}
-
-.tooltipTitle {
-  font-size: 12px;
-  color: #9ca3af;
-  margin-bottom: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.tooltipRow {
+.bulletChart {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 220px;
+  padding: 6px 2px;
+}
+
+.bulletRow {
+  display: grid;
+  grid-template-columns: 42px 1fr 170px;
+  gap: 12px;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
 }
 
-.tooltipDotNet,
-.tooltipDotGross {
-  width: 8px;
-  height: 8px;
+.bulletMonth {
+  color: #a1a1aa;
+  font-size: 12px;
+}
+
+.bulletTrack {
+  position: relative;
+  height: 14px;
   border-radius: 999px;
-  display: inline-block;
+  background: #0f172a;
+  overflow: hidden;
 }
 
-.tooltipDotNet {
-  background: #2563eb;
+.bulletBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 180ms ease;
 }
 
-.tooltipDotGross {
-  background: #22c55e;
+.bulletBarGross {
+  background: linear-gradient(90deg, #0ea5e9 0%, #38bdf8 100%);
+  opacity: 0.65;
 }
 
-.chartText {
-  fill: #9ca3af;
-  font-size: 3px;
+.bulletBarNet {
+  background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+}
+
+.bulletValue {
+  color: #a1a1aa;
+  font-size: 12px;
+  text-align: right;
 }
 
 .legend {
@@ -178,6 +219,16 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+@media (max-width: 992px) {
+  .actionGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metricRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .funnelItem:hover {

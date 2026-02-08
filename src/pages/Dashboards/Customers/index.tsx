@@ -5,7 +5,7 @@ import {
 } from '@/services/invoices';
 import { listPlans, type RecurringPlanDTO } from '@/services/recurring';
 import { PageContainer } from '@ant-design/pro-components';
-import { history } from '@umijs/max';
+import { getLocale, history, useIntl } from '@umijs/max';
 import { Button, Card, Col, Row, Table, Tag } from 'antd';
 import React, { useEffect, useMemo, useState } from 'react';
 import styles from '../styles.less';
@@ -22,7 +22,8 @@ type CustomerRow = {
 };
 
 const CustomerHealthDashboard: React.FC = () => {
-  const money = new Intl.NumberFormat('en', {
+  const intl = useIntl();
+  const money = new Intl.NumberFormat(getLocale(), {
     style: 'currency',
     currency: 'EUR',
   });
@@ -115,12 +116,19 @@ const CustomerHealthDashboard: React.FC = () => {
     });
   }, [customers, invoices, plans]);
 
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
+  const riskLabel = (risk: string) => t(`status.${risk.toLowerCase()}`, risk);
+
   return (
-    <PageContainer title="Customer Health">
+    <PageContainer title={t('page.dashboards.customers', 'Customer Health')}>
       <div className={styles.container}>
         <Row gutter={[16, 16]}>
           <Col xs={24}>
-            <Card className={styles.card} title="Customer risk overview">
+            <Card
+              className={styles.card}
+              title={t('dash.customers.riskOverview', 'Customer risk overview')}
+            >
               <Table
                 className={styles.table}
                 size="small"
@@ -128,39 +136,42 @@ const CustomerHealthDashboard: React.FC = () => {
                 loading={loading}
                 dataSource={rows}
                 columns={[
-                  { title: 'Customer', dataIndex: 'customer' },
                   {
-                    title: 'Revenue',
+                    title: t('table.customer', 'Customer'),
+                    dataIndex: 'customer',
+                  },
+                  {
+                    title: t('table.revenue', 'Revenue'),
                     dataIndex: 'revenue',
                     align: 'right',
                     render: (val: number) => money.format(val),
                   },
                   {
-                    title: 'Outstanding',
+                    title: t('table.outstanding', 'Outstanding'),
                     dataIndex: 'outstanding',
                     align: 'right',
                     render: (val: number) => money.format(val),
                   },
                   {
-                    title: 'Overdue',
+                    title: t('table.overdue', 'Overdue'),
                     dataIndex: 'overdue',
                     align: 'right',
                     render: (val: number) => money.format(val),
                   },
                   {
-                    title: 'Last Payment',
+                    title: t('table.lastPayment', 'Last Payment'),
                     dataIndex: 'lastPayment',
                     render: (val?: string) =>
                       val ? new Date(val).toISOString().slice(0, 10) : '—',
                   },
                   {
-                    title: 'Recurring value',
+                    title: t('table.recurringValue', 'Recurring value'),
                     dataIndex: 'recurringValue',
                     align: 'right',
                     render: (val: number) => money.format(val),
                   },
                   {
-                    title: 'Risk',
+                    title: t('table.risk', 'Risk'),
                     dataIndex: 'risk',
                     render: (val: string) => (
                       <Tag
@@ -172,12 +183,12 @@ const CustomerHealthDashboard: React.FC = () => {
                             : 'green'
                         }
                       >
-                        {val}
+                        {riskLabel(val)}
                       </Tag>
                     ),
                   },
                   {
-                    title: 'Action',
+                    title: t('table.actions', 'Actions'),
                     key: 'action',
                     render: (_: any, record: CustomerRow) => (
                       <Button
@@ -191,7 +202,7 @@ const CustomerHealthDashboard: React.FC = () => {
                           )
                         }
                       >
-                        View customer
+                        {t('action.viewCustomer', 'View customer')}
                       </Button>
                     ),
                   },

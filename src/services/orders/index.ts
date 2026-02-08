@@ -22,6 +22,8 @@ export interface OrderResponseDTO {
   orderNumber?: string;
   customerId: number;
   customerName: string;
+  createdByUserId?: number;
+  createdByName?: string;
   status: OrderStatus;
   recurring?: boolean;
   recurringPlanId?: number;

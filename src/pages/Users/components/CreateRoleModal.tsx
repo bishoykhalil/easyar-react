@@ -1,5 +1,6 @@
 import { createRole, type Role } from '@/services/roles';
 import { ModalForm, ProFormText } from '@ant-design/pro-components';
+import { useIntl } from '@umijs/max';
 import { message } from 'antd';
 import React from 'react';
 
@@ -14,9 +15,13 @@ const CreateRoleModal: React.FC<Props> = ({
   onOpenChange,
   onCreated,
 }) => {
+  const intl = useIntl();
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
+
   return (
     <ModalForm<Role>
-      title="Create Role"
+      title={t('modal.roleCreate', 'Create Role')}
       width={400}
       open={open}
       onOpenChange={onOpenChange}
@@ -24,20 +29,28 @@ const CreateRoleModal: React.FC<Props> = ({
       onFinish={async (values) => {
         try {
           const res = await createRole(values);
-          message.success('Role created');
+          message.success(t('message.roleCreated', 'Role created'));
           onCreated?.(res.data);
           return true;
         } catch (err: any) {
-          message.error(err?.data?.message || 'Create role failed');
+          message.error(
+            err?.data?.message ||
+              t('message.failedToCreateRole', 'Create role failed'),
+          );
           return false;
         }
       }}
     >
       <ProFormText
         name="name"
-        label="Role Name"
-        rules={[{ required: true, message: 'Please enter a role name' }]}
-        placeholder="e.g. ADMIN"
+        label={t('label.roleName', 'Role Name')}
+        rules={[
+          {
+            required: true,
+            message: t('message.roleNameRequired', 'Please enter a role name'),
+          },
+        ]}
+        placeholder={t('placeholder.roleExample', 'e.g. ADMIN')}
       />
     </ModalForm>
   );

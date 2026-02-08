@@ -1,4 +1,5 @@
 import type { CustomerDTO } from '@/services/customers';
+import { useIntl } from '@umijs/max';
 import { Descriptions, Drawer } from 'antd';
 import React from 'react';
 
@@ -13,44 +14,56 @@ const CustomerDetailsDrawer: React.FC<Props> = ({
   onClose,
   customer,
 }) => {
+  const intl = useIntl();
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
+
   return (
     <Drawer
       width={480}
       open={open}
       onClose={onClose}
-      title={customer ? `Customer: ${customer.name}` : 'Customer Details'}
+      title={
+        customer
+          ? `${t('label.customer', 'Customer')}: ${customer.name}`
+          : t('modal.customerDetails', 'Customer Details')
+      }
     >
       {customer && (
         <Descriptions column={1} size="small" bordered>
-          <Descriptions.Item label="Name">{customer.name}</Descriptions.Item>
-          <Descriptions.Item label="Email">
+          <Descriptions.Item label={t('label.name', 'Name')}>
+            {customer.name}
+          </Descriptions.Item>
+          <Descriptions.Item label={t('label.email', 'Email')}>
             {customer.email || '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="Phone">
+          <Descriptions.Item label={t('label.phone', 'Phone')}>
             {customer.phone || '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="City">
+          <Descriptions.Item label={t('label.city', 'City')}>
             {customer.city || '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="Country">
+          <Descriptions.Item label={t('label.country', 'Country')}>
             {customer.countryCode || '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="Payment Terms (days)">
+          <Descriptions.Item
+            label={t('label.paymentTermsDays', 'Payment Terms (days)')}
+          >
             {customer.paymentTermsDays ?? '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="VAT ID">
+          <Descriptions.Item label={t('label.vatId', 'VAT ID')}>
             {customer.vatId || '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="Tax Number">
+          <Descriptions.Item label={t('label.taxNumber', 'Tax Number')}>
             {customer.taxNumber || '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="Address">
+          <Descriptions.Item label={t('label.address', 'Address')}>
             {customer.street || '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="Postal Code">
+          <Descriptions.Item label={t('label.postalCode', 'Postal Code')}>
             {customer.postalCode || '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="Notes">
+          <Descriptions.Item label={t('label.notes', 'Notes')}>
             {(customer as any).notes || '-'}
           </Descriptions.Item>
         </Descriptions>

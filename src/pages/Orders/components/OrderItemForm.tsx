@@ -5,6 +5,7 @@ import {
   ProFormDigit,
   ProFormSelect,
 } from '@ant-design/pro-components';
+import { useIntl } from '@umijs/max';
 import React, { useRef } from 'react';
 
 type Props = {
@@ -15,10 +16,13 @@ type Props = {
 
 const OrderItemForm: React.FC<Props> = ({ open, onOpenChange, onFinish }) => {
   const formRef = useRef<any>();
+  const intl = useIntl();
+  const t = (id: string, defaultMessage: string) =>
+    intl.formatMessage({ id, defaultMessage });
 
   return (
     <ModalForm
-      title="Add Item"
+      title={t('modal.orderItemAdd', 'Add Item')}
       open={open}
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
@@ -31,7 +35,7 @@ const OrderItemForm: React.FC<Props> = ({ open, onOpenChange, onFinish }) => {
     >
       <ProFormSelect
         name="priceListItemId"
-        label="Price List Item"
+        label={t('label.priceListItem', 'Price List Item')}
         showSearch
         debounceTime={300}
         request={async ({ keyWords }) => {
@@ -54,7 +58,15 @@ const OrderItemForm: React.FC<Props> = ({ open, onOpenChange, onFinish }) => {
           }
         }}
         allowClear
-        rules={[{ required: true, message: 'Select a price list item' }]}
+        rules={[
+          {
+            required: true,
+            message: t(
+              'message.selectItemRequired',
+              'Select a price list item',
+            ),
+          },
+        ]}
         fieldProps={{
           onSelect: (_val, option: any) => {
             const data = option?.data || {};
@@ -67,13 +79,13 @@ const OrderItemForm: React.FC<Props> = ({ open, onOpenChange, onFinish }) => {
       />
       <ProFormDigit
         name="quantity"
-        label="Quantity"
+        label={t('label.quantity', 'Quantity')}
         min={0}
         fieldProps={{ step: 0.1 }}
       />
       <ProFormDigit
         name="discountPercent"
-        label="Discount %"
+        label={t('label.discount', 'Discount %')}
         min={0}
         max={100}
         fieldProps={{ step: 1 }}
